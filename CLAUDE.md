@@ -39,8 +39,8 @@ Claude Code / Antigravity(리더 세션)는 작업 전 이 문서를 항상 먼�
 
 | 담당자 | 무엇을 맡나 | 손의 크기(읽기/쓰기) | 담당 폴더 |
 |---|---|---|---|
-| 소은 (도메인 담당) | 카테고리 화면, 재회/기념일 로직, 꾸미기 시스템, AI 스케줄링, 캘린더 UI, 방 조율/정산 로직, **애플/구글 로그인** | 읽기 + 쓰기 | `app/lib/features/*`, `app/lib/design_system/`, `functions/src/aiScheduling`, `functions/src/settlement`, `app/lib/services/auth/apple_auth.dart`, `app/lib/services/auth/google_auth.dart` |
-| 보안 담당 | **카카오 로그인**, 인앱결제/구독, Firestore 보안 규칙, 카카오페이/토스 딥링크 구현, 시크릿 관리 | 읽기 + 쓰기 | `app/lib/services/auth/kakao_auth.dart`, `app/lib/services/payment`, `firestore.rules`, `functions/.env` 관리 |
+| 소은 (도메인 담당) | 카테고리 화면, 재회/기념일 로직, 꾸미기 시스템, AI 스케줄링, 캘린더 UI, 방 조율/정산 로직, **로그인 전체(카카오/애플/구글)** | 읽기 + 쓰기 | `lib/features/*`, `lib/design_system/`, `functions/src/aiScheduling`, `functions/src/settlement`, `lib/services/auth/` |
+| 보안 담당 | 인앱결제/구독, Firestore 보안 규칙, 카카오페이/토스 딥링크 구현, 시크릿 관리 | 읽기 + 쓰기 | `lib/services/payment`, `firestore.rules`, `functions/.env` 관리 |
 
 - **쓰기는 각자 담당 폴더 안에서만.** 서브에이전트를 만들 때도 `tools`로 손 크기를 이 표대로 제한한다 (읽기 전용 담당자에게 파일 쓰기 도구를 주지 않는다)
 - 겹치는 파일(`pubspec.yaml`, 라우팅, `design_system/`, `firestore.rules`)을 고칠 땐 반드시 상대에게 알리고 진행
@@ -51,27 +51,26 @@ Claude Code / Antigravity(리더 세션)는 작업 전 이 문서를 항상 먼�
 ## 2. 폴더 구조 (레포 전체)
 
 ```
-haruchip/
-├── app/                          # Flutter 앱 (프론트엔드)
-│   ├── lib/
-│   │   ├── core/                 # 공통 유틸, 상수, 테마, 라우팅
-│   │   ├── design_system/        # 색상/타이포/컴포넌트 토큰
-│   │   ├── features/
-│   │   │   ├── onboarding/
-│   │   │   ├── home/
-│   │   │   ├── couple/
-│   │   │   ├── solo/
-│   │   │   ├── plan/             # 계획/업무/학업/시험/군대 공통
-│   │   │   ├── ai_scheduling/
-│   │   │   ├── calendar/         # 하루칩 캘린더 (개인/커플/방/외부연동)
-│   │   │   ├── settlement/       # 정산
-│   │   │   ├── friends/
-│   │   │   └── profile_settings/
-│   │   └── services/             # Firebase, 결제, 딥링크 등 외부 서비스 래퍼
-│   ├── env/
-│   │   ├── dev.json.example      # ✅ 커밋 — 형식(키 이름)만 존재
-│   │   └── dev.json               # 🚫 .gitignore — 실제 값
-│   └── pubspec.yaml
+haruchip/                         # Flutter 앱(프론트엔드) 겸 레포 루트
+├── lib/
+│   ├── core/                 # 공통 유틸, 상수, 테마, 라우팅
+│   ├── design_system/        # 색상/타이포/컴포넌트 토큰
+│   ├── features/
+│   │   ├── onboarding/
+│   │   ├── home/
+│   │   ├── couple/
+│   │   ├── solo/
+│   │   ├── plan/             # 계획/업무/학업/시험/군대 공통
+│   │   ├── ai_scheduling/
+│   │   ├── calendar/         # 하루칩 캘린더 (개인/커플/방/외부연동)
+│   │   ├── settlement/       # 정산
+│   │   ├── friends/
+│   │   └── profile_settings/
+│   └── services/             # Firebase, 결제, 딥링크 등 외부 서비스 래퍼 (auth/, payment/ 포함)
+├── env/
+│   ├── dev.json.example      # ✅ 커밋 — 형식(키 이름)만 존재
+│   └── dev.json               # 🚫 .gitignore — 실제 값
+├── pubspec.yaml
 ├── functions/                    # Firebase Cloud Functions (백엔드 로직)
 │   ├── src/{aiScheduling, settlement, calendarSync}/
 │   ├── .env.example               # ✅ 커밋 — 형식만
@@ -94,8 +93,8 @@ haruchip/
 
 ```
 # .gitignore 필수 항목
-app/env/dev.json
-app/env/prod.json
+env/dev.json
+env/prod.json
 functions/.env
 **/*serviceAccountKey.json
 **/*service-account*.json
@@ -140,15 +139,17 @@ scheduleRooms/{roomId}
 - 카테고리는 태그 개념 — 동일 카테고리 다중 인스턴스 항상 허용
 - 실용형 UI에 감성형 전용 컴포넌트(스티커·애니메이션) 재사용 금지
 - 대시보드에 "+ 새 카테고리 추가하기" 진입점 항상 유지 (온보딩 이후에도 추가 가능해야 함)
+- 모든 화면은 `haruchip_app.html`(디자인 프로토타입)의 색상·톤·컴포넌트 스타일을 따른다. 임의로 새 컬러 팔레트나 UI 패턴을 만들지 않는다.
 
 ---
 
 ## 6. 색상 시스템
 
-- D-day/캘린더 등록 시 색상은 **무료 프리셋 7개 고정** (`app/lib/design_system/colors.dart`의 `kFreeColorPresets`)
+- D-day/캘린더 등록 시 색상은 **무료 프리셋 7개 고정** (`lib/design_system/colors.dart`의 `kFreeColorPresets`)
 - 프리셋 외 커스텀 컬러피커는 프리미엄 유료 기능
 - 커플 공용 캘린더 색상은 방 생성 시 지정, 변경 시 상대에게 즉시 반영
 - 색상은 항상 디자인 토큰 참조, 하드코딩 금지
+- 모든 화면은 `haruchip_app.html`(디자인 프로토타입)의 색상·톤·컴포넌트 스타일을 따른다. 임의로 새 컬러 팔레트나 UI 패턴을 만들지 않는다.
 
 ---
 
@@ -215,11 +216,13 @@ function calculateSettlement(payments, members) {
 
 | 화면 | 핵심 동작 |
 |---|---|
-| 온보딩 | 스플래시 → 권한요청 → 로그인 → 카테고리 선택(다중) → 캘린더 연동 선택 → 대시보드 뷰모드 → 위젯 안내 |
+| 온보딩 | 스플래시 → 권한요청 → 로그인 → 카테고리 선택(다중) → 대시보드 뷰모드 → 완료 화면 → 메인 셸(대시보드 탭) |
 | 대시보드 | 인사 + 뷰모드 전환 + 카테고리 카드(전용/범용) + "+ 새 카테고리 추가하기" |
-| 캘린더 | 통합 미니뷰(하루칩/구글/네이버 색상 구분) + 날짜별 일정 + 등록 팝업 |
+| 캘린더 | 통합 미니뷰(하루칩/구글/네이버 색상 구분) + 날짜별 일정 + 등록 팝업 + "연동 설정"(→ 캘린더 연동 설정 화면) |
 | 일정·정산방 | 방 목록 → 방 상세(가능일 토글/추천/확정) → 정산(차액계산+딥링크) |
-| 커플 방 | 아바타 매칭 애니메이션, 공동 꾸미기, 기념일 자동계산, 사진첩 |
+| 커플 방 | 아바타 매칭 애니메이션, 공동 꾸미기, 기념일 자동계산, 사진첩(사진첩은 아직 미구현) — "기록 관리" 진입점으로 이별/재회 기록·요약형/타임라인형 화면 연결 |
+
+> (2025 재구현 갱신) 캘린더 연동 선택은 온보딩에서 제거되고 캘린더 탭 "연동 설정" 버튼 뒤 설정 화면으로 재배치됐다. 위젯 안내는 온보딩에서 제거되고 설정 모달의 "홈 화면 위젯 가이드 → 보기"로 재배치됐다. 두 화면 모두 완전 삭제 대신 용도를 바꿔 재활용했다(`lib/features/onboarding/screens/calendar_integration_screen.dart`, `widget_guide_screen.dart`). 근거: `reference/haruchip_app.html`이 온보딩/메인 4탭의 유일한 디자인·기능 기준이다.
 
 ### 공통 UI — 모달 닫기
 X 버튼 / 하단 "닫기" 버튼 / 배경 클릭 3가지 모두 지원:

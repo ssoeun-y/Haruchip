@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>하루칩 (HaruChip) - 나만의 맞춤형 디데이 & 일정 관리</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts (Inter & Pretendard vibe) -->
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pastelYellow: {
+                            50: '#FFFEF5',
+                            100: '#FFFBEB',
+                            200: '#FEF3C7',
+                            300: '#FDE68A',
+                            400: '#FCD34D',
+                            500: '#F59E0B',
+                            600: '#D97706',
+                            accent: '#FACC15', // Main yellow
+                            soft: '#FFF9E6',    // Card / Background soft tone
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Pretendard', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; background-color: #FFFDF4; }
+        .custom-shadow { box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.08), 0 8px 10px -6px rgba(245, 158, 11, 0.04); }
+        .tab-transition { transition: all 0.2s ease-in-out; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased min-h-screen flex flex-col justify-between selection:bg-yellow-200">
+
+    <div id="app" class="w-full max-w-md mx-auto bg-white min-h-screen shadow-2xl flex flex-col relative overflow-hidden pb-20">
+        
+        <!-- TOP APP BAR -->
+        <header id="app-header" class="sticky top-0 z-30 bg-white/90 backdrop-blur-md px-5 py-4 border-b border-yellow-100 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <div class="w-9 h-9 rounded-2xl bg-yellow-300 flex items-center justify-center shadow-sm text-amber-800 font-bold text-lg">H</div>
+                <div>
+                    <h1 class="font-bold text-lg text-gray-900 tracking-tight leading-tight">하루칩</h1>
+                    <p class="text-xs text-amber-600 font-medium">HaruChip Life & D-Day</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="openModal('notificationModal')" class="p-2 rounded-xl bg-yellow-50 hover:bg-yellow-100 text-amber-700 transition relative">
+                    <i data-lucide="bell" class="w-5 h-5"></i>
+                    <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                </button>
+                <button onclick="openModal('settingsModal')" class="p-2 rounded-xl bg-yellow-50 hover:bg-yellow-100 text-amber-700 transition">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- DYNAMIC SCREEN CONTAINER -->
+        <main id="screen-container" class="flex-1 overflow-y-auto">
+            <!-- Rendered dynamically by JS -->
+        </main>
+
+        <!-- BOTTOM NAVIGATION BAR -->
+        <nav id="bottom-nav" class="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-yellow-100 px-6 py-3 flex justify-between items-center z-30 shadow-lg">
+            <button onclick="switchTab('dashboard')" class="nav-btn flex flex-col items-center space-y-1 text-amber-500" data-target="dashboard">
+                <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                <span class="text-[11px] font-semibold">대시보드</span>
+            </button>
+            <button onclick="switchTab('calendar')" class="nav-btn flex flex-col items-center space-y-1 text-gray-400 hover:text-amber-500" data-target="calendar">
+                <i data-lucide="calendar" class="w-6 h-6"></i>
+                <span class="text-[11px] font-medium">캘린더</span>
+            </button>
+            <button onclick="switchTab('rooms')" class="nav-btn flex flex-col items-center space-y-1 text-gray-400 hover:text-amber-500" data-target="rooms">
+                <i data-lucide="users" class="w-6 h-6"></i>
+                <span class="text-[11px] font-medium">일정·정산방</span>
+            </button>
+            <button onclick="switchTab('coupleRoom')" class="nav-btn flex flex-col items-center space-y-1 text-gray-400 hover:text-amber-500" data-target="coupleRoom">
+                <i data-lucide="heart" class="w-6 h-6"></i>
+                <span class="text-[11px] font-medium">우리의방</span>
+            </button>
+        </nav>
+
+        <!-- MODALS (Settings, Calendar Picker, Notification, Add Item) -->
+        <div id="modal-container"></div>
+    </div>
+
+    <script>
+        function getCategoryEmoji(key) {
+            const emojis = {
+                couple: '❤️',
+                solo: '🌟',
+                military: '🎖️',
+                exam: '📚',
+                birthday: '🎂',
+                pet: '🐾',
+                plan: '📝',
+                baby: '👶'
+            };
+            return emojis[key] || '📌';
+        }
+
+        // 다중 결제자 정산 — 부채 최소화(debt simplification) 계산
+        // payments: {이름: 낸금액}, members: 참여자 전체 이름 배열
+        // 반환: { total, share, tx: [{from, to, amount}] }
+        function calculateSettlement(payments, members) {
+            const total = Object.values(payments).reduce((a, b) => a + b, 0);
+            const share = Math.round(total / members.length);
+            let balances = members.map(name => ({ name, balance: (payments[name] || 0) - share }));
+            let creditors = balances.filter(b => b.balance > 0).sort((a, b) => b.balance - a.balance);
+            let debtors = balances.filter(b => b.balance < 0).sort((a, b) => a.balance - b.balance);
+            let i = 0, j = 0, tx = [];
+            while (i < debtors.length && j < creditors.length) {
+                const d = debtors[i], c = creditors[j];
+                const amt = Math.min(-d.balance, c.balance);
+                if (amt > 0) tx.push({ from: d.name, to: c.name, amount: amt });
+                d.balance += amt; c.balance -= amt;
+                if (Math.abs(d.balance) < 1) i++;
+                if (Math.abs(c.balance) < 1) j++;
+            }
+            return { total, share, tx };
+        }
+
+        // App State
+        let currentScreen = 'onboarding'; // onboarding, main
+        let currentTab = 'dashboard';
+        let onboardingStep = 1;
+        let viewMode = 'vertical'; // vertical, box
+        let selectedCategories = ['couple', 'exam', 'birthday', 'pet'];
+        let calendarSyncType = 'google'; // google, naver, haru
+        
+        let appState = {
+            user: { name: "김하루", email: "haru@example.com", avatar: "🌻" },
+            categories: {
+                couple: { active: true, title: "커플", partner: "민수", startDate: "2024-05-14", ddays: [{title: "1주년 기념일", date: "2025-05-14", repeat: true}, {title: "오션뷰 글램핑 여행", date: "2026-06-20", repeat: false}] },
+                solo: { active: true, title: "솔로 / 최애 덕질", targetName: "프로젝트 앨범 발매", ddayDate: "2026-09-01" },
+                military: { active: false, title: "군대 (곰신)", enlistDate: "2024-03-10", dischargeDate: "2025-12-09" },
+                exam: { active: true, title: "시험 / 자격증", exams: [{name: "정보처리기사 필기", date: "2026-04-15"}, {name: "SQLD 실기", date: "2026-05-20"}] },
+                birthday: { active: true, title: "생일", birthdays: [{name: "엄마 생신", date: "2026-10-12"}, {name: "베프 지민", date: "2026-11-04"}] },
+                pet: { active: true, title: "반려동물", petName: "초코 (포메라니안)", birthDate: "2023-08-20" },
+                plan: { active: true, title: "계획 / 일정", plans: [{title: "유럽 여행 계획 확정", date: "2026-07-01"}] }
+            },
+            scheduleRooms: [
+                { id: 1, name: "주말 대학 동창 모임", code: "ROOM88", members: [{name: "하루", icon: "🐥"}, {name: "민수", icon: "🐶"}, {name: "서연", icon: "🐱"}, {name: "도윤", icon: "🦊"}], dates: {"2026-06-13": ["하루", "민수", "서연"], "2026-06-14": ["하루", "민수", "서연", "도윤"]}, settlement: { title: "주말 대학 동창 모임 정산", payments: {"하루": 60000, "서연": 40000} } },
+                { id: 2, name: "팀 프로젝트 회식", code: "TEAM99", members: [{name: "하루", icon: "🐥"}, {name: "팀장님", icon: "🦁"}, {name: "인턴", icon: "🐰"}], dates: {"2026-06-10": ["하루", "팀장님"]}, settlement: { title: "팀 프로젝트 회식 정산", payments: {"팀장님": 45000} } }
+            ]
+        };
+
+        // Initialize Lucide Icons
+        function renderIcons() {
+            lucide.createIcons();
+        }
+
+        // Boot app
+        window.addEventListener('DOMContentLoaded', () => {
+            renderScreen();
+        });
+
+        function renderScreen() {
+            const container = document.getElementById('screen-container');
+            const header = document.getElementById('app-header');
+            const nav = document.getElementById('bottom-nav');
+
+            if (currentScreen === 'onboarding') {
+                header.classList.add('hidden');
+                nav.classList.add('hidden');
+                container.innerHTML = renderOnboardingHTML();
+            } else {
+                header.classList.remove('hidden');
+                nav.classList.remove('hidden');
+                if (currentTab === 'dashboard') {
+                    container.innerHTML = renderDashboardHTML();
+                } else if (currentTab === 'calendar') {
+                    container.innerHTML = renderCalendarHTML();
+                } else if (currentTab === 'rooms') {
+                    container.innerHTML = renderRoomsHTML();
+                } else if (currentTab === 'coupleRoom') {
+                    container.innerHTML = renderCoupleRoomHTML();
+                }
+            }
+            renderIcons();
+        }
+
+        function renderOnboardingHTML() {
+            if (onboardingStep === 1) {
+                return `
+                <div class="p-6 flex flex-col items-center justify-center min-h-screen text-center bg-gradient-to-b from-yellow-50 to-white">
+                    <div class="w-24 h-24 bg-yellow-300 rounded-3xl flex items-center justify-center shadow-lg text-amber-800 text-5xl mb-6 animate-bounce">🌻</div>
+                    <span class="px-3 py-1 bg-yellow-100 text-amber-800 text-xs font-semibold rounded-full mb-3">스마트 디데이 & 일정 관리</span>
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">소중한 날들을 더 특별하게,<br>하루칩과 함께 시작해요</h2>
+                    <p class="text-gray-500 text-sm mb-8">커플, 시험, 생일, 군대, 반려동물까지 모든 디데이를 한눈에 관리하세요.</p>
+                    <button onclick="nextOnboarding()" class="w-full py-4 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-bold rounded-2xl shadow-lg transition transform active:scale-95">시작하기</button>
+                </div>`;
+            } else if (onboardingStep === 2) {
+                return `
+                <div class="p-6 flex flex-col justify-between min-h-screen py-12">
+                    <div>
+                        <div class="flex items-center space-x-2 text-amber-600 font-semibold text-sm mb-2"><span>STEP 1/3</span></div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-2">관심 있는 카테고리를 골라주세요</h2>
+                        <p class="text-gray-500 text-sm mb-6">나에게 필요한 카테고리를 선택하세요 (중복 선택 가능)</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            ${Object.keys(appState.categories).map(key => {
+                                const cat = appState.categories[key];
+                                const isSelected = selectedCategories.includes(key);
+                                return `
+                                <div onclick="toggleCategory('${key}')" class="p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col items-center justify-center space-y-2 ${isSelected ? 'border-yellow-400 bg-yellow-50 text-amber-900 font-bold shadow-sm' : 'border-gray-100 bg-white text-gray-600 hover:border-yellow-200'}">
+                                    <span class="text-2xl">${getCategoryEmoji(key)}</span>
+                                    <span class="text-sm">${cat.title}</span>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                    <button onclick="nextOnboarding()" class="w-full py-4 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-bold rounded-2xl shadow-lg transition">다음으로</button>
+                </div>`;
+            } else if (onboardingStep === 3) {
+                return `
+                <div class="p-6 flex flex-col justify-between min-h-screen py-12">
+                    <div>
+                        <div class="flex items-center space-x-2 text-amber-600 font-semibold text-sm mb-2"><span>STEP 2/3</span></div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-2">대시보드 보기 방식 선택</h2>
+                        <p class="text-gray-500 text-sm mb-6">메인 화면에서 정보를 어떤 형태로 확인할까요?</p>
+                        <div class="space-y-3">
+                            <label class="flex items-center p-4 rounded-2xl border-2 border-yellow-300 bg-yellow-50 cursor-pointer">
+                                <input type="radio" name="viewMode" checked class="text-yellow-500 focus:ring-yellow-400">
+                                <div class="ml-3"><span class="font-bold text-gray-900 block">세로 정렬 스와이프형</span><span class="text-xs text-gray-500">카테고리별 깔끔한 리스트 세로 배치</span></div>
+                            </label>
+                            <label class="flex items-center p-4 rounded-2xl border-2 border-gray-100 bg-white cursor-pointer hover:border-yellow-200">
+                                <input type="radio" name="viewMode" class="text-yellow-500 focus:ring-yellow-400">
+                                <div class="ml-3"><span class="font-bold text-gray-900 block">박스형 대시보드</span><span class="text-xs text-gray-500">네모난 카드 그리드 개별 노출형</span></div>
+                            </label>
+                        </div>
+                    </div>
+                    <button onclick="nextOnboarding()" class="w-full py-4 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-bold rounded-2xl shadow-lg transition">다음으로</button>
+                </div>`;
+            } else {
+                return `
+                <div class="p-6 flex flex-col justify-between min-h-screen py-12 text-center">
+                    <div>
+                        <div class="w-20 h-20 bg-yellow-200 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner">🎉</div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-2">설정이 완료되었습니다!</h2>
+                        <p class="text-gray-500 text-sm mb-8">구글/네이버 캘린더 연동 및 위젯 가이드가 준비되었어요. 이제 하루칩의 모든 기능을 만나보세요.</p>
+                        <div class="p-4 bg-yellow-50 rounded-2xl text-left border border-yellow-100 text-xs text-amber-800 space-y-1">
+                            <p class="font-bold">💡 팁:</p>
+                            <p>• 상단 설정 버튼에서 언제든지 카테고리를 추가하거나 수정할 수 있습니다.</p>
+                            <p>• 캘린더 탭에서 친구들과 그룹 일정을 조율하고 정산해보세요!</p>
+                        </div>
+                    </div>
+                    <button onclick="finishOnboarding()" class="w-full py-4 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-bold rounded-2xl shadow-lg transition">이제 시작하겠습니다 ✨</button>
+                </div>`;
+            }
+        }
+
+        function toggleCategory(key) {
+            if (selectedCategories.includes(key)) {
+                selectedCategories = selectedCategories.filter(k => k !== key);
+            } else {
+                selectedCategories.push(key);
+            }
+            renderScreen();
+        }
+
+        function nextOnboarding() {
+            onboardingStep++;
+            renderScreen();
+        }
+
+        function finishOnboarding() {
+            currentScreen = 'main';
+            renderScreen();
+        }
+
+        function renderDashboardHTML() {
+            const today = new Date();
+            const coupleStartDate = new Date(appState.categories.couple.startDate);
+            const diffTime = Math.abs(today - coupleStartDate);
+            const coupleDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            return `
+            <div class="p-5 space-y-6">
+                <!-- Top Greeting & Quick Stats -->
+                <div class="bg-gradient-to-r from-yellow-300 via-yellow-200 to-amber-100 p-5 rounded-3xl shadow-sm text-amber-950 flex justify-between items-center">
+                    <div>
+                        <span class="text-xs font-semibold px-2 py-0.5 bg-white/60 rounded-full text-amber-900">오늘 하루도 행복하게 🌻</span>
+                        <h2 class="text-xl font-bold mt-1">안녕하세요, ${appState.user.name}님!</h2>
+                        <p class="text-xs text-amber-800 mt-0.5">다가오는 기념일과 일정을 확인하세요.</p>
+                    </div>
+                    <div class="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-2xl">
+                        ${appState.user.avatar}
+                    </div>
+                </div>
+
+                <!-- View Mode Filter Bar -->
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-gray-900 text-sm flex items-center gap-1.5"><i data-lucide="sparkles" class="w-4 h-4 text-amber-500"></i> 나의 주요 디데이</h3>
+                    <div class="flex bg-gray-100 p-1 rounded-xl text-xs font-medium">
+                        <button onclick="setViewMode('vertical')" class="px-3 py-1 rounded-lg ${viewMode === 'vertical' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}">세로형</button>
+                        <button onclick="setViewMode('box')" class="px-3 py-1 rounded-lg ${viewMode === 'box' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}">박스형</button>
+                    </div>
+                </div>
+
+                <!-- Category Cards Feed -->
+                <div class="${viewMode === 'box' ? 'grid grid-cols-2 gap-3' : 'space-y-4'}">
+                    
+                    <!-- COUPLE CARD -->
+                    ${selectedCategories.includes('couple') ? `
+                    <div onclick="switchTab('coupleRoom')" class="bg-gradient-to-br from-pink-50 to-white border border-pink-100 p-4 rounded-3xl shadow-sm cursor-pointer hover:shadow-md transition relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-24 h-24 bg-pink-100/50 rounded-bl-full pointer-events-none"></div>
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-8 h-8 rounded-xl bg-pink-200 flex items-center justify-center text-pink-700">❤️</span>
+                                <div>
+                                    <h4 class="font-bold text-gray-900 text-sm">우리 사랑한 지</h4>
+                                    <span class="text-[11px] text-pink-600 font-medium">커플 디데이 & 방</span>
+                                </div>
+                            </div>
+                            <span class="text-xs bg-pink-100 text-pink-700 px-2 py-1 rounded-full font-bold">D+${coupleDays}</span>
+                        </div>
+                        <div class="text-xs text-gray-600 bg-white/80 p-2.5 rounded-2xl border border-pink-50 flex justify-between items-center">
+                            <span>✨ 다가오는 기념일: <b>1주년 기념일</b> (D-15)</span>
+                            <button onclick="event.stopPropagation(); openCalendarPopup('커플 1주년')" class="text-amber-600 hover:text-amber-700 font-bold text-[11px] bg-yellow-50 px-2 py-1 rounded-lg">캘린더 연동</button>
+                        </div>
+                    </div>` : ''}
+
+                    <!-- EXAM CARD -->
+                    ${selectedCategories.includes('exam') ? `
+                    <div class="bg-white border border-yellow-100 p-4 rounded-3xl shadow-sm">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-8 h-8 rounded-xl bg-yellow-100 flex items-center justify-center text-amber-700">📚</span>
+                                <div>
+                                    <h4 class="font-bold text-gray-900 text-sm">시험 / 자격증 디데이</h4>
+                                    <span class="text-[11px] text-amber-600 font-medium">목표 달성 프로젝트</span>
+                                </div>
+                            </div>
+                            <button onclick="openAddModal('exam')" class="text-xs text-amber-700 bg-yellow-50 px-2 py-1 rounded-lg font-bold">+ 추가</button>
+                        </div>
+                        <div class="space-y-2">
+                            ${appState.categories.exam.exams.map((ex, idx) => `
+                            <div class="flex justify-between items-center text-xs bg-yellow-50/50 p-2.5 rounded-xl">
+                                <span class="font-medium text-gray-800">${ex.name}</span>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-yellow-400 text-amber-950 px-2 py-0.5 rounded-full font-bold">D-${34 + idx * 10}</span>
+                                    <button onclick="openCalendarPopup('${ex.name}')" class="text-[10px] text-gray-500 underline">연동</button>
+                                </div>
+                            </div>`).join('')}
+                        </div>
+                    </div>` : ''}
+
+                    <!-- BIRTHDAY CARD -->
+                    ${selectedCategories.includes('birthday') ? `
+                    <div class="bg-white border border-yellow-100 p-4 rounded-3xl shadow-sm">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700">🎂</span>
+                                <div>
+                                    <h4 class="font-bold text-gray-900 text-sm">소중한 사람 생일</h4>
+                                    <span class="text-[11px] text-purple-600 font-medium">매년 자동 반복 D-Day</span>
+                                </div>
+                            </div>
+                            <button onclick="openAddModal('birthday')" class="text-xs text-purple-700 bg-purple-50 px-2 py-1 rounded-lg font-bold">+ 추가</button>
+                        </div>
+                        <div class="space-y-2">
+                            ${appState.categories.birthday.birthdays.map((b, idx) => `
+                            <div class="flex justify-between items-center text-xs bg-purple-50/40 p-2.5 rounded-xl">
+                                <span class="font-medium text-gray-800">${b.name} (${b.date})</span>
+                                <span class="bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full font-bold">D-${12 + idx * 23}</span>
+                            </div>`).join('')}
+                        </div>
+                    </div>` : ''}
+
+                    <!-- PET CARD -->
+                    ${selectedCategories.includes('pet') ? `
+                    <div class="bg-white border border-yellow-100 p-4 rounded-3xl shadow-sm">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700">🐾</span>
+                                <div>
+                                    <h4 class="font-bold text-gray-900 text-sm">반려동물 기록</h4>
+                                    <span class="text-[11px] text-amber-600 font-medium">${appState.categories.pet.petName}</span>
+                                </div>
+                            </div>
+                            <span class="text-xs bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full font-bold">D+650일째</span>
+                        </div>
+                    </div>` : ''}
+
+                    <!-- OTHER CATEGORIES (added later via + 추가) -->
+                    ${selectedCategories.filter(k => !['couple','exam','birthday','pet'].includes(k)).map(k => renderGenericCategoryCard(k)).join('')}
+
+                    <!-- ADD NEW CATEGORY CARD -->
+                    <div onclick="openAddCategoryModal()" class="border-2 border-dashed border-yellow-200 p-4 rounded-3xl flex items-center justify-center gap-2 text-amber-600 font-bold text-sm cursor-pointer hover:bg-yellow-50 transition">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i> 새 카테고리 추가하기
+                    </div>
+
+                </div>
+            </div>`;
+        }
+
+        function daysUntil(dateStr) {
+            const diff = Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
+            return diff >= 0 ? `D-${diff}` : `D+${Math.abs(diff)}`;
+        }
+
+        function renderGenericCategoryCard(key) {
+            const cat = appState.categories[key];
+            if (!cat) return '';
+            let bodyHtml = '';
+            if (cat.ddayDate) {
+                bodyHtml = `<div class="text-xs bg-gray-50 p-2.5 rounded-xl flex justify-between items-center"><span class="font-medium text-gray-800">${cat.targetName || cat.title}</span><span class="font-bold text-amber-700 bg-yellow-100 px-2 py-0.5 rounded-full">${daysUntil(cat.ddayDate)}</span></div>`;
+            } else if (cat.dischargeDate) {
+                bodyHtml = `<div class="text-xs bg-gray-50 p-2.5 rounded-xl flex justify-between items-center"><span class="font-medium text-gray-800">전역일</span><span class="font-bold text-amber-700 bg-yellow-100 px-2 py-0.5 rounded-full">${daysUntil(cat.dischargeDate)}</span></div>`;
+            } else if (cat.plans) {
+                bodyHtml = cat.plans.map(p => `<div class="text-xs bg-gray-50 p-2.5 rounded-xl flex justify-between items-center mb-1.5"><span class="font-medium text-gray-800">${p.title}</span><span class="font-bold text-amber-700 bg-yellow-100 px-2 py-0.5 rounded-full">${daysUntil(p.date)}</span></div>`).join('');
+            } else {
+                bodyHtml = `<div class="text-xs text-gray-400 p-2.5">아직 등록된 항목이 없어요</div>`;
+            }
+            return `
+            <div class="bg-white border border-yellow-100 p-4 rounded-3xl shadow-sm">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-base">${getCategoryEmoji(key)}</span>
+                        <h4 class="font-bold text-gray-900 text-sm">${cat.title}</h4>
+                    </div>
+                </div>
+                <div class="space-y-0">${bodyHtml}</div>
+            </div>`;
+        }
+
+        function openAddCategoryModal() {
+            const container = document.getElementById('modal-container');
+            const available = Object.keys(appState.categories).filter(k => !selectedCategories.includes(k));
+            container.innerHTML = `
+            <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-gray-900">카테고리 추가하기</h3>
+                        <button onclick="closeModal()" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-xl"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    ${available.length === 0 ? `<p class="text-xs text-gray-400 text-center py-6">이미 모든 카테고리를 사용 중이에요 🎉</p>` : `
+                    <p class="text-xs text-gray-500">대시보드에 추가할 카테고리를 선택하세요</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        ${available.map(key => `
+                        <div onclick="addCategoryToDashboard('${key}')" class="p-4 rounded-2xl border-2 border-gray-100 hover:border-yellow-300 bg-white cursor-pointer flex flex-col items-center justify-center gap-2 transition">
+                            <span class="text-2xl">${getCategoryEmoji(key)}</span>
+                            <span class="text-xs font-bold text-gray-700">${appState.categories[key].title}</span>
+                        </div>`).join('')}
+                    </div>`}
+                </div>
+            </div>`;
+            renderIcons();
+        }
+
+        function addCategoryToDashboard(key) {
+            if (!selectedCategories.includes(key)) selectedCategories.push(key);
+            appState.categories[key].active = true;
+            closeModal();
+            renderScreen();
+            showToast(`✨ '${appState.categories[key].title}' 카테고리가 추가되었습니다!`);
+        }
+
+        function setViewMode(mode) {
+            viewMode = mode;
+            renderScreen();
+        }
+
+        function renderCalendarHTML() {
+            return `
+            <div class="p-5 space-y-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900">통합 캘린더</h2>
+                        <p class="text-xs text-gray-500">구글 / 네이버 / 하루칩 캘린더 동시 조회</p>
+                    </div>
+                    <div class="flex space-x-1">
+                        <button onclick="openSyncSettings()" class="px-3 py-1.5 bg-yellow-100 text-amber-900 text-xs font-bold rounded-xl flex items-center gap-1">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> 연동 설정
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Mini Month View Box -->
+                <div class="bg-white p-4 rounded-3xl border border-yellow-100 shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="font-bold text-gray-800 text-sm">2026년 6월</span>
+                        <div class="space-x-1">
+                            <button class="p-1 rounded-lg hover:bg-gray-100 text-gray-600"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                            <button class="p-1 rounded-lg hover:bg-gray-100 text-gray-600"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-400 mb-2">
+                        <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-xs">
+                        ${generateCalendarGrid()}
+                    </div>
+                </div>
+
+                <!-- Schedule List for Selected Day -->
+                <div class="bg-white p-4 rounded-3xl border border-yellow-100 shadow-sm space-y-3">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-bold text-gray-800 text-xs flex items-center gap-1"><i data-lucide="calendar-days" class="w-3.5 h-3.5 text-amber-500"></i> 6월 10일 일정 목록</h4>
+                        <button onclick="openAddScheduleModal()" class="text-xs text-amber-700 bg-yellow-50 px-2.5 py-1 rounded-lg font-bold">+ 일정 추가</button>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="p-3 bg-yellow-50/60 rounded-2xl flex justify-between items-center text-xs">
+                            <div>
+                                <span class="font-bold text-gray-900 block">정보처리기사 필기 접수</span>
+                                <span class="text-gray-500 text-[11px]">구글 캘린더 연동됨</span>
+                            </div>
+                            <span class="px-2 py-1 bg-yellow-200 text-amber-900 rounded-lg font-bold">오전 10:00</span>
+                        </div>
+                        <div class="p-3 bg-pink-50/60 rounded-2xl flex justify-between items-center text-xs">
+                            <div>
+                                <span class="font-bold text-gray-900 block">커플 1주년 레스토랑 예약</span>
+                                <span class="text-pink-600 text-[11px]">하루칩 단독 일정</span>
+                            </div>
+                            <span class="px-2 py-1 bg-pink-200 text-pink-900 rounded-lg font-bold">오후 7:00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function generateCalendarGrid() {
+            let html = '';
+            for(let i=1; i<=30; i++) {
+                const isToday = i === 10;
+                const hasEvent = [5, 10, 15, 20].includes(i);
+                html += `<div class="py-2 rounded-xl flex flex-col items-center justify-center cursor-pointer transition ${isToday ? 'bg-yellow-400 text-amber-950 font-bold shadow-sm' : 'hover:bg-yellow-50 text-gray-700'}">
+                    <span>${i}</span>
+                    ${hasEvent ? '<span class="w-1 h-1 bg-amber-500 rounded-full mt-0.5"></span>' : ''}
+                </div>`;
+            }
+            return html;
+        }
+
+        function renderRoomsHTML() {
+            return `
+            <div class="p-5 space-y-5">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900">일정 조율 & 정산 방</h2>
+                        <p class="text-xs text-gray-500">모임 멤버들과 과반수 추천 및 토스/카카오 정산</p>
+                    </div>
+                    <button onclick="openCreateRoomModal()" class="px-3 py-1.5 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-bold text-xs rounded-xl shadow-sm">+ 방 만들기</button>
+                </div>
+
+                <!-- Room Cards List -->
+                <div class="space-y-4">
+                    ${appState.scheduleRooms.map(room => `
+                    <div onclick="openRoomDetailModal(${room.id})" class="bg-white border border-yellow-100 p-4 rounded-3xl shadow-sm space-y-3 cursor-pointer hover:shadow-md transition">
+                        <div class="flex justify-between items-start">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-9 h-9 rounded-2xl bg-yellow-100 flex items-center justify-center text-amber-800 font-bold">👥</span>
+                                <div>
+                                    <h4 class="font-bold text-gray-900 text-sm">${room.name}</h4>
+                                    <span class="text-[11px] text-gray-400">초대코드: <b>${room.code}</b></span>
+                                </div>
+                            </div>
+                            <span class="text-xs bg-yellow-50 text-amber-800 px-2.5 py-1 rounded-full font-bold">멤버 ${room.members.length}명</span>
+                        </div>
+
+                        <!-- Members Avatar List -->
+                        <div class="flex items-center space-x-1 pt-1 border-t border-gray-50">
+                            ${room.members.map(m => `<span class="px-2 py-1 bg-gray-50 rounded-lg text-xs font-medium text-gray-700">${m.icon} ${m.name}</span>`).join('')}
+                        </div>
+
+                        <!-- Optimal Date Recommendation Box -->
+                        <div class="bg-yellow-50/70 p-3 rounded-2xl border border-yellow-100 flex justify-between items-center text-xs">
+                            <div>
+                                <span class="font-bold text-amber-900 block">📅 탭해서 가능한 날짜 표시하기</span>
+                                <span class="text-amber-700 text-[11px]">멤버들과 겹치는 시간을 자동으로 찾아드려요</span>
+                            </div>
+                            <button onclick="event.stopPropagation(); openSettlementModal(${room.id})" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-sm">정산하기</button>
+                        </div>
+                    </div>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        function renderCoupleRoomHTML() {
+            return `
+            <div class="p-5 space-y-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900">우리의 방 (커플룸)</h2>
+                        <p class="text-xs text-pink-600">쥬니어네이버 파니룸 콘셉트 가상 공간</p>
+                    </div>
+                    <span class="text-xs bg-pink-100 text-pink-700 px-3 py-1 rounded-full font-bold">D+380일째 💕</span>
+                </div>
+
+                <!-- Virtual Room Canvas -->
+                <div class="bg-gradient-to-b from-pink-100 to-yellow-50 border-2 border-pink-200 h-64 rounded-3xl relative overflow-hidden flex flex-col items-center justify-center p-4 shadow-inner">
+                    <!-- Wallpaper Decor Frame -->
+                    <div class="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1.5 rounded-2xl shadow-sm text-xs font-bold text-pink-700 flex items-center gap-1">
+                        🖼️ 우리의 신혼집 안방 액자
+                    </div>
+
+                    <!-- Avatars Meeting Animation -->
+                    <div class="flex items-center justify-center space-x-12 mt-6">
+                        <div class="flex flex-col items-center animate-pulse">
+                            <div class="w-16 h-16 bg-white rounded-full shadow-md flex items-center justify-center text-3xl border-2 border-pink-300">🐥</div>
+                            <span class="text-xs font-bold text-gray-800 mt-2 bg-white/70 px-2 py-0.5 rounded-lg">하루</span>
+                        </div>
+                        <div class="text-2xl animate-bounce">💖</div>
+                        <div class="flex flex-col items-center animate-pulse">
+                            <div class="w-16 h-16 bg-white rounded-full shadow-md flex items-center justify-center text-3xl border-2 border-pink-300">🐶</div>
+                            <span class="text-xs font-bold text-gray-800 mt-2 bg-white/70 px-2 py-0.5 rounded-lg">민수</span>
+                        </div>
+                    </div>
+
+                    <div class="absolute bottom-3 text-[11px] text-pink-700 font-medium bg-white/60 px-3 py-1 rounded-full">
+                        ✨ 가구 배치 및 액자 사진 등록 기능 지원
+                    </div>
+                </div>
+
+                <!-- Couple D-Days & Milestones -->
+                <div class="bg-white p-4 rounded-3xl border border-yellow-100 shadow-sm space-y-3">
+                    <h4 class="font-bold text-gray-800 text-xs flex items-center gap-1"><i data-lucide="heart" class="w-3.5 h-3.5 text-pink-500"></i> 다가오는 기념일 자동 예측</h4>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between items-center p-2.5 bg-pink-50/50 rounded-xl">
+                            <span class="font-medium text-gray-800">사귄 지 400일</span>
+                            <span class="font-bold text-pink-700 bg-pink-100 px-2 py-0.5 rounded-md">D-20</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2.5 bg-pink-50/50 rounded-xl">
+                            <span class="font-medium text-gray-800">2주년 기념일</span>
+                            <span class="font-bold text-pink-700 bg-pink-100 px-2 py-0.5 rounded-md">D-340</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // Navigation Tab Switcher
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if (btn.getAttribute('data-target') === tab) {
+                    btn.classList.remove('text-gray-400');
+                    btn.classList.add('text-amber-500');
+                } else {
+                    btn.classList.remove('text-amber-500');
+                    btn.classList.add('text-gray-400');
+                }
+            });
+            renderScreen();
+        }
+
+        function openModal(modalId) {
+            const container = document.getElementById('modal-container');
+            if (modalId === 'settingsModal') {
+                container.innerHTML = `
+                <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                    <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-lg text-gray-900">환경 설정 및 관리</h3>
+                            <button onclick="closeModal()" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-xl"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        </div>
+                        <div class="space-y-2 text-xs">
+                            <div class="p-3 bg-yellow-50 rounded-2xl flex justify-between items-center">
+                                <span class="font-medium text-gray-800">구글 / 네이버 캘린더 연동</span>
+                                <span class="text-amber-700 font-bold">연동됨 (구글)</span>
+                            </div>
+                            <div class="p-3 bg-gray-50 rounded-2xl flex justify-between items-center">
+                                <span class="font-medium text-gray-800">토스 / 카카오뱅크 정산 연동</span>
+                                <span class="text-green-600 font-bold">활성화</span>
+                            </div>
+                            <div class="p-3 bg-gray-50 rounded-2xl flex justify-between items-center">
+                                <span class="font-medium text-gray-800">홈 화면 위젯 가이드</span>
+                                <span class="text-gray-500 underline cursor-pointer">보기</span>
+                            </div>
+                        </div>
+                        <button onclick="closeModal()" class="w-full py-3 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-bold rounded-2xl shadow-sm transition">확인</button>
+                    </div>
+                </div>`;
+            } else if (modalId === 'notificationModal') {
+                container.innerHTML = `
+                <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-lg text-gray-900">알림 센터</h3>
+                            <button onclick="closeModal()" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-xl"><i data-lucide="x" class="w-5 h-5"></i></button>
+                        </div>
+                        <div class="space-y-2 text-xs">
+                            <div class="p-3 bg-yellow-50/60 rounded-2xl">
+                                <span class="font-bold text-gray-900 block">🎉 1주년 기념일 D-15</span>
+                                <span class="text-gray-500">커플룸에서 다가오는 기념일을 확인하세요!</span>
+                            </div>
+                            <div class="p-3 bg-gray-50 rounded-2xl">
+                                <span class="font-bold text-gray-900 block">💸 정산 요청 도착</span>
+                                <span class="text-gray-500">주말 대학 동창 모임 정산이 완료되었습니다.</span>
+                            </div>
+                        </div>
+                        <button onclick="closeModal()" class="w-full py-3 bg-yellow-400 text-amber-950 font-bold rounded-2xl">닫기</button>
+                    </div>
+                </div>`;
+            }
+            renderIcons();
+        }
+
+        function openCalendarPopup(eventName) {
+            const container = document.getElementById('modal-container');
+            container.innerHTML = `
+            <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+                    <div class="w-12 h-12 bg-yellow-100 rounded-2xl flex items-center justify-center mx-auto text-amber-700 text-xl font-bold">📅</div>
+                    <h3 class="font-bold text-lg text-gray-900">캘린더에 등록하시겠습니까?</h3>
+                    <p class="text-xs text-gray-500"><b>${eventName}</b> 일정을 어떤 캘린더에 추가할까요?</p>
+                    <div class="space-y-2 text-xs">
+                        <button onclick="confirmCalendarSync('구글 캘린더')" class="w-full p-3 bg-yellow-50 hover:bg-yellow-100 text-amber-900 font-bold rounded-2xl border border-yellow-200 transition">구글 캘린더 동시 업로드</button>
+                        <button onclick="confirmCalendarSync('네이버 캘린더')" class="w-full p-3 bg-gray-50 hover:bg-gray-100 text-gray-800 font-medium rounded-2xl border border-gray-200 transition">네이버 캘린더 동시 업로드</button>
+                        <button onclick="confirmCalendarSync('하루칩 단독')" class="w-full p-3 bg-gray-50 hover:bg-gray-100 text-gray-600 font-medium rounded-2xl transition">하루칩 캘린더만 사용</button>
+                    </div>
+                </div>
+            </div>`;
+            renderIcons();
+        }
+
+        function openAddModal(categoryKey) {
+            const container = document.getElementById('modal-container');
+            let title = '항목 추가';
+            if (categoryKey === 'exam') title = '시험 / 자격증 추가';
+            if (categoryKey === 'birthday') title = '생일 추가';
+            if (categoryKey === 'pet') title = '반려동물 기록 추가';
+
+            container.innerHTML = `
+            <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-gray-900">${title}</h3>
+                        <button onclick="closeModal()" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-xl"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="font-semibold text-gray-700 block mb-1">제목 / 이름</label>
+                            <input type="text" id="newItemTitle" placeholder="예: 정보처리기사 실기" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:border-yellow-400">
+                        </div>
+                        <div>
+                            <label class="font-semibold text-gray-700 block mb-1">날짜</label>
+                            <input type="date" id="newItemDate" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:border-yellow-400">
+                        </div>
+                    </div>
+                    <button onclick="saveNewItem('${categoryKey}')" class="w-full py-3.5 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-bold rounded-2xl shadow-sm transition">등록하기</button>
+                </div>
+            </div>`;
+            renderIcons();
+        }
+
+        function saveNewItem(categoryKey) {
+            const title = document.getElementById('newItemTitle').value;
+            const date = document.getElementById('newItemDate').value;
+            if(!title) {
+                showToast("⚠️ 제목을 입력해주세요!");
+                return;
+            }
+            if(categoryKey === 'exam') {
+                appState.categories.exam.exams.push({ name: title, date: date || '2026-12-31' });
+            } else if(categoryKey === 'birthday') {
+                appState.categories.birthday.birthdays.push({ name: title, date: date || '2026-12-31' });
+            }
+            closeModal();
+            renderScreen();
+            showToast("✨ 새로운 항목이 추가되었습니다!");
+        }
+
+        function openAddScheduleModal() {
+            openAddModal('exam');
+        }
+
+        function confirmCalendarSync(type) {
+            closeModal();
+            showToast(`✨ ${type}에 일정이 성공적으로 등록되었습니다!`);
+        }
+
+        function openSyncSettings() {
+            openModal('settingsModal');
+        }
+
+        function openCreateRoomModal() {
+            const container = document.getElementById('modal-container');
+            container.innerHTML = `
+            <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-gray-900">새로운 일정·정산 방 만들기</h3>
+                        <button onclick="closeModal()" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-xl"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="font-semibold text-gray-700 block mb-1">방 이름</label>
+                            <input type="text" id="newRoomName" placeholder="예: 회사 동기 소모임" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:border-yellow-400">
+                        </div>
+                    </div>
+                    <button onclick="createRoomAction()" class="w-full py-3.5 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-bold rounded-2xl shadow-sm transition">방 만들기 및 초대코드 생성</button>
+                </div>
+            </div>`;
+            renderIcons();
+        }
+
+        function createRoomAction() {
+            const nameInput = document.getElementById('newRoomName').value;
+            if(!nameInput) return;
+            appState.scheduleRooms.push({
+                id: Date.now(),
+                name: nameInput,
+                code: "ROOM" + Math.floor(Math.random()*900+100),
+                members: [{name: "하루", icon: "🐥"}],
+                dates: {}
+            });
+            closeModal();
+            renderScreen();
+            showToast("🎉 새로운 모임 방이 생성되었습니다!");
+        }
+
+        // 일정 방 상세 — 멤버별 가능 날짜 표시/확정
+        function generateRoomDateRange() {
+            const base = new Date('2026-06-08');
+            const out = [];
+            for (let i = 0; i < 8; i++) {
+                const d = new Date(base); d.setDate(base.getDate() + i);
+                out.push(d.toISOString().slice(0, 10));
+            }
+            return out;
+        }
+
+        function formatShortDate(dateStr) {
+            const d = new Date(dateStr);
+            const days = ['일', '월', '화', '수', '목', '금', '토'];
+            return `${d.getMonth() + 1}/${d.getDate()}(${days[d.getDay()]})`;
+        }
+
+        function openRoomDetailModal(roomId) {
+            const room = appState.scheduleRooms.find(r => r.id === roomId);
+            const dateList = generateRoomDateRange();
+            const memberCount = room.members.length;
+            let bestDate = null, bestCount = 0;
+            dateList.forEach(d => {
+                const c = (room.dates[d] || []).length;
+                if (c > bestCount) { bestCount = c; bestDate = d; }
+            });
+
+            const container = document.getElementById('modal-container');
+            container.innerHTML = `
+            <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-900">${room.name}</h3>
+                            <p class="text-[11px] text-gray-400">초대코드 ${room.code} · 멤버 ${memberCount}명</p>
+                        </div>
+                        <button onclick="closeModal()" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-xl"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+
+                    <div class="flex flex-wrap gap-1.5">
+                        ${room.members.map(m => `<span class="px-2 py-1 bg-gray-50 rounded-lg text-[11px] font-medium text-gray-700">${m.icon} ${m.name}</span>`).join('')}
+                    </div>
+
+                    <div>
+                        <p class="text-xs font-semibold text-gray-700 mb-2">가능한 날짜를 탭해서 표시해주세요 (나: 하루 🐥)</p>
+                        <div class="grid grid-cols-4 gap-2">
+                            ${dateList.map(d => {
+                                const avail = room.dates[d] || [];
+                                const isMe = avail.includes('하루');
+                                const isFull = avail.length === memberCount && memberCount > 0;
+                                return `
+                                <div onclick="toggleAvailability(${roomId},'${d}')" class="cursor-pointer rounded-2xl p-2 text-center border-2 transition ${isFull ? 'border-amber-400 bg-amber-50' : isMe ? 'border-yellow-300 bg-yellow-50' : 'border-gray-100 bg-white hover:border-yellow-200'}">
+                                    <div class="text-[11px] font-bold text-gray-700">${formatShortDate(d)}</div>
+                                    <div class="flex justify-center flex-wrap gap-0.5 mt-1 min-h-[14px]">
+                                        ${avail.map(name => {
+                                            const ic = (room.members.find(m => m.name === name) || {}).icon || '👤';
+                                            return `<span class="text-[10px]">${ic}</span>`;
+                                        }).join('')}
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                        <div class="flex items-center gap-3 mt-3 text-[10px] text-gray-400">
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-amber-400 inline-block"></span>전원 가능</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-yellow-300 inline-block"></span>내가 체크함</span>
+                        </div>
+                    </div>
+
+                    ${bestCount > 0 ? `
+                    <div class="bg-yellow-50/70 p-3 rounded-2xl border border-yellow-100 text-xs">
+                        <span class="font-bold text-amber-900 block">✨ 최다 인원 가능일: ${formatShortDate(bestDate)} (${bestCount}/${memberCount}명)</span>
+                        <button onclick="confirmRoomDate(${roomId},'${bestDate}')" class="mt-2 w-full py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl">이 날짜로 확정하기</button>
+                    </div>` : `<p class="text-xs text-gray-400 text-center py-2">아직 아무도 가능 날짜를 표시하지 않았어요</p>`}
+
+                    <button onclick="openSettlementModal(${roomId})" class="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-2xl transition text-sm">정산하기로 이동</button>
+                </div>
+            </div>`;
+            renderIcons();
+        }
+
+        function toggleAvailability(roomId, date) {
+            const room = appState.scheduleRooms.find(r => r.id === roomId);
+            if (!room.dates[date]) room.dates[date] = [];
+            const idx = room.dates[date].indexOf('하루');
+            if (idx >= 0) room.dates[date].splice(idx, 1);
+            else room.dates[date].push('하루');
+            openRoomDetailModal(roomId);
+        }
+
+        function confirmRoomDate(roomId, date) {
+            closeModal();
+            showToast(`🎉 ${formatShortDate(date)} 일정이 확정되어 캘린더에 자동 등록되었습니다!`);
+        }
+
+        function openSettlementModal(roomId) {
+            const room = appState.scheduleRooms.find(r => r.id === roomId);
+            const memberNames = room.members.map(m => m.name);
+            const iconOf = name => (room.members.find(m => m.name === name) || {}).icon || '👤';
+            const { total, share, tx } = calculateSettlement(room.settlement.payments, memberNames);
+            const paidBy = Object.entries(room.settlement.payments).map(([name, amt]) => `${name} ${amt.toLocaleString()}원`).join(' · ');
+
+            const container = document.getElementById('modal-container');
+            container.innerHTML = `
+            <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-gray-900">정산하기</h3>
+                        <button onclick="closeModal()" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-xl"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    <p class="text-xs text-gray-500"><b>${room.name}</b> · ${memberNames.length}명 · 1인당 ${share.toLocaleString()}원</p>
+
+                    <div class="p-3 bg-yellow-50 rounded-2xl text-xs space-y-1">
+                        <div class="flex justify-between font-bold"><span>총 금액</span><span class="text-amber-800">${total.toLocaleString()}원</span></div>
+                        <div class="text-gray-500">결제자: ${paidBy}</div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <span class="font-semibold text-gray-700 text-xs block">보내야 할 금액 (최소 송금 횟수로 자동 계산)</span>
+                        ${tx.length === 0 ? `<p class="text-xs text-gray-400 p-3 text-center">정산할 차액이 없습니다 🎉</p>` : tx.map(t => `
+                        <div class="p-3 bg-gray-50 rounded-2xl space-y-2">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="flex items-center gap-1 font-semibold text-gray-800">${iconOf(t.from)} ${t.from} <i data-lucide="arrow-right" class="w-3 h-3 text-gray-400"></i> ${iconOf(t.to)} ${t.to}</span>
+                                <span class="font-bold text-amber-800">${t.amount.toLocaleString()}원</span>
+                            </div>
+                            <div class="flex gap-1.5">
+                                <button onclick="sendViaDeeplink('kakao','${t.to}',${t.amount})" class="flex-1 py-2 bg-[#FEE500] text-[#3C1E1E] text-[11px] font-bold rounded-xl">카카오페이로 보내기</button>
+                                <button onclick="sendViaDeeplink('toss','${t.to}',${t.amount})" class="flex-1 py-2 bg-[#1B64DA] text-white text-[11px] font-bold rounded-xl">토스로 보내기</button>
+                            </div>
+                        </div>`).join('')}
+                    </div>
+
+                    <p class="text-[11px] text-gray-400 leading-relaxed">송금 버튼을 누르면 금액이 미리 채워진 상태로 카카오페이/토스가 열려요. 실제 송금을 진행한 시점에 정산이 확정되고, 이후에도 언제든 재계산할 수 있어요.</p>
+                    <button onclick="closeModal()" class="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-2xl transition">닫기</button>
+                </div>
+            </div>`;
+            renderIcons();
+        }
+
+        function sendViaDeeplink(provider, toName, amount) {
+            // 실제 구현 시: 카카오페이 송금링크 생성 API / supertoss://send?... 로 딥링크 오픈
+            const label = provider === 'kakao' ? '카카오페이' : '토스';
+            showToast(`💸 ${label} 딥링크 오픈 — ${toName}에게 ${amount.toLocaleString()}원 (송금 완료 시 정산 확정)`);
+        }
+
+        function closeModal() {
+            document.getElementById('modal-container').innerHTML = '';
+        }
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-5 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-4 py-2.5 rounded-2xl shadow-xl z-50 transition animate-bounce';
+            toast.innerText = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+        }
+    </script>
+</body>
+</html>
