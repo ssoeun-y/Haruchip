@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "932846129523",
+    "project_id": "haruchip-6a5aa",
+    "storage_bucket": "haruchip-6a5aa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:932846129523:android:99c4bd52d6086bee93f506",
+        "android_client_info": {
+          "package_name": "com.example.haruchip"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSnFXIZAXsqpsY_kmv2nTo5vHgHNcuZ-k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
