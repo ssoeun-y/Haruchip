@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
+import '../../calendar/providers/schedule_room_provider.dart';
 import '../models/plan_item.dart';
 import '../providers/plan_provider.dart';
 
@@ -16,13 +18,15 @@ import '../providers/plan_provider.dart';
 ///
 /// 실용형 카테고리 규칙(§5)에 따라 스티커/애니메이션 같은 감성형 전용
 /// 컴포넌트는 쓰지 않고 레이아웃도 고정한다.
-class PlanItemCard extends StatelessWidget {
+class PlanItemCard extends ConsumerWidget {
   const PlanItemCard({super.key, required this.item});
 
   final PlanItem item;
 
-  /// `add_plan_item_dialog.dart`가 저장하는 대표 categoryKey → 한글 라벨.
-  /// 목록에 없는 값(향후 다른 담당자가 추가한 태그 등)은 원문 그대로 보여준다
+  /// 대표 categoryKey → 한글 라벨. 'study'/'work'/'military'는 이제
+  /// `add_category_item_dialog.dart` 통합 이후 새로 만들 수는 없지만(§3
+  /// PlanScreen 진입점은 'plan' 고정), 과거 mock/데이터에 남아있을 수
+  /// 있어 표시 매핑은 계속 유지한다. 목록에 없는 값은 원문 그대로 보여준다
   /// — categoryKey는 태그 개념(§5)이라 화면에서 값 자체를 막지 않는다.
   static const _categoryLabels = {
     'plan': '계획',
@@ -35,7 +39,18 @@ class PlanItemCard extends StatelessWidget {
   String get _categoryLabel => _categoryLabels[item.categoryKey] ?? item.categoryKey;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final roomLink = item.roomLink;
+    String? roomName;
+    if (roomLink != null) {
+      for (final room in ref.watch(scheduleRoomsProvider)) {
+        if (room.id == roomLink) {
+          roomName = room.name;
+          break;
+        }
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -78,6 +93,15 @@ class PlanItemCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         '· 매년 반복',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.protoSubtitle,
+                        ),
+                      ),
+                    ],
+                    if (roomName != null) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '· 📅 $roomName',
                         style: AppTypography.caption.copyWith(
                           color: AppColors.protoSubtitle,
                         ),

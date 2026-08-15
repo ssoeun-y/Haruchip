@@ -26,6 +26,8 @@ class MilitaryDashboardCard extends ConsumerWidget {
     final progress = ref.watch(militaryProgressProvider);
     final dischargeDday = ref.watch(militaryDischargeDdayProvider);
     final leaveDday = ref.watch(militaryLeaveDdayProvider);
+    final currentRank = ref.watch(militaryCurrentRankProvider);
+    final nextRankDday = ref.watch(militaryNextRankDdayProvider);
     final progressPercent = (progress * 100).round();
 
     return Container(
@@ -110,6 +112,23 @@ class MilitaryDashboardCard extends ConsumerWidget {
                   '전역 $dischargeDday',
                   style: AppTypography.caption.copyWith(
                     color: AppColors.protoCardSelectedText,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  nextRankDday == null
+                      ? '${currentRank.labelKo} (진급 완료)'
+                      : '${currentRank.labelKo} · 다음 진급 $nextRankDday',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.protoCardText,
                     fontWeight: FontWeight.w700,
                   ),
                 ),

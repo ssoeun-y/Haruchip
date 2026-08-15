@@ -50,16 +50,25 @@ class BabyDashboardCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.protoCardSelectedBg,
-                  borderRadius: BorderRadius.circular(12),
+              // 프로필 사진(§5.5 "프로필 사진 원형 프레임") — items.first에
+              // photoUrl이 있으면 원형 사진으로, 없으면 기존 이모지
+              // 아이콘으로 대체한다.
+              if (items.isNotEmpty && items.first.photoUrl != null)
+                CircleAvatar(
+                  radius: 16,
+                  backgroundImage: NetworkImage(items.first.photoUrl!),
+                )
+              else
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.protoCardSelectedBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text('👶', style: TextStyle(fontSize: 14)),
                 ),
-                child: const Text('👶', style: TextStyle(fontSize: 14)),
-              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

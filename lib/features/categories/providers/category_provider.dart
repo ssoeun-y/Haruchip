@@ -24,6 +24,7 @@ class CategoryListNotifier extends Notifier<List<Category>> {
     required String name,
     required String emoji,
     required String colorHex,
+    String? backgroundImageUrl,
   }) {
     final category = Category(
       id: 'cat-${DateTime.now().microsecondsSinceEpoch}',
@@ -32,6 +33,7 @@ class CategoryListNotifier extends Notifier<List<Category>> {
       emoji: emoji,
       colorHex: colorHex,
       createdAt: DateTime.now(),
+      backgroundImageUrl: backgroundImageUrl,
     );
     state = [...state, category];
     return category;

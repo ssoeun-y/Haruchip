@@ -45,6 +45,21 @@ class GenericCategoryDashboardCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 배경 사진(§6 사진 업로드, §5 감성형 자유도) — 설정된 인스턴스만
+          // 헤더 위에 배너로 보여준다. 실용형 카테고리는 애초에 이 필드를
+          // 만들 UI가 없어 항상 null이라 자연히 노출되지 않는다.
+          if (category.backgroundImageUrl != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                category.backgroundImageUrl!,
+                height: 80,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           Row(
             children: [
               Container(

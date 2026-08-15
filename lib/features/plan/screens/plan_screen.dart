@@ -3,16 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
+import '../../home/widgets/add_category_item_dialog.dart';
 import '../providers/plan_provider.dart';
-import '../widgets/add_plan_item_dialog.dart';
 import '../widgets/kanban_board.dart';
 import '../widgets/plan_item_card.dart';
 
 /// 계획/업무/학업/시험/군대 D-day 리스트 화면 — 실용형 카테고리(§5).
 ///
-/// 상단 "+ 추가" 버튼으로 [AddPlanItemDialog]를 열고, 항목 카드를 D-day
-/// 오름차순(provider가 항상 정렬 유지)으로 나열한다. 동일 카테고리를
-/// 여러 개 추가하는 것을 막지 않는다(§5 다중 인스턴스 허용).
+/// 상단 "+ 추가" 버튼은 대시보드 카드들과 같은 [showAddCategoryItemDialog]를
+/// `categoryKey: 'plan'` 고정으로 연다 — 원래 이 화면 전용으로 따로 있던
+/// `add_plan_item_dialog.dart`(제목/날짜/카테고리 칩만 지원하던 더 얕은
+/// 버전)를 없애고 캘린더 탭의 "+ 일정 추가"와 같은 통합 다이얼로그로
+/// 합쳤다 — UI는 하나, 진입점마다 고정 categoryKey만 다르게 넘기는
+/// 방식. 항목 카드를 D-day 오름차순(provider가 항상 정렬 유지)으로
+/// 나열한다. 동일 카테고리를 여러 개 추가하는 것을 막지 않는다(§5 다중
+/// 인스턴스 허용).
 ///
 /// "리스트"/"칸반" 뷰모드 토글(핸드오프 문서 §5.7)을 추가로 제공한다.
 /// 칸반 뷰는 `categoryKey == 'plan'` 항목만 [KanbanBoard]에 넘겨
@@ -36,6 +41,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   @override
   Widget build(BuildContext context) {
     final items = ref.watch(planListProvider);
+    final predictedItems = ref.watch(predictedPlanItemsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.protoBackground,
@@ -70,7 +76,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                     ),
                   ),
                   ElevatedButton(
-                    onPressed: () => AddPlanItemDialog.show(context),
+                    onPressed: () => showAddCategoryItemDialog(
+                      context,
+                      categoryKey: 'plan',
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.protoButtonBg,
                       foregroundColor: AppColors.protoButtonText,
@@ -93,6 +102,35 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
               ),
               const SizedBox(height: 16),
               if (_mode == _PlanViewMode.list) ...[
+                // "예측 리스트업" 섹션 — 디데이 추가 화면 명세 §3:
+                // repeat.type != none 이거나 isPredicted == true인 항목은
+                // 아래 전체 목록과 별개로 항상 여기 노출한다(additive —
+                // 전체 목록에서 제외하지 않는다).
+                if (predictedItems.isNotEmpty) ...[
+                  Text(
+                    '🔮 예측 리스트업',
+                    style: AppTypography.cardLabel.copyWith(
+                      color: AppColors.protoHeading,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '반복되거나 자동 예측된 일정이에요',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.protoSubtitle,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  for (final item in predictedItems) PlanItemCard(item: item),
+                  const SizedBox(height: 20),
+                  Text(
+                    '전체 목록',
+                    style: AppTypography.cardLabel.copyWith(
+                      color: AppColors.protoHeading,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 if (items.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),

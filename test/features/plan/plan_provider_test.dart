@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:haruchip/features/categories/logic/repeat_rule.dart';
 import 'package:haruchip/features/plan/models/plan_item.dart';
 import 'package:haruchip/features/plan/providers/plan_provider.dart';
 
@@ -73,6 +74,74 @@ void main() {
       final items = container.read(planListProvider);
       expect(items.length, beforeCount - 1);
       expect(items.any((i) => i.id == targetId), isFalse);
+    });
+  });
+
+  group('predictedPlanItemsProvider', () {
+    test('반복 설정(repeatConfig.isRepeating)이 있는 항목은 항상 포함된다', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(planListProvider.notifier);
+
+      notifier.addItem(PlanItem(
+        id: 'repeat-1',
+        title: '매년 반복 항목',
+        date: DateTime(2027, 3, 1),
+        categoryKey: 'birthday',
+        repeatConfig: RepeatConfig.yearlyDefault,
+      ));
+      notifier.addItem(PlanItem(
+        id: 'no-repeat-1',
+        title: '반복 없는 항목',
+        date: DateTime(2027, 3, 2),
+        categoryKey: 'plan',
+      ));
+
+      final predicted = container.read(predictedPlanItemsProvider);
+      expect(predicted.any((i) => i.id == 'repeat-1'), isTrue);
+      expect(predicted.any((i) => i.id == 'no-repeat-1'), isFalse);
+    });
+
+    test('isPredicted == true인 항목도 반복 설정 없이 포함된다', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(planListProvider.notifier);
+
+      notifier.addItem(PlanItem(
+        id: 'predicted-1',
+        title: '자동 예측 항목',
+        date: DateTime(2027, 4, 1),
+        categoryKey: 'couple',
+        isPredicted: true,
+      ));
+
+      final predicted = container.read(predictedPlanItemsProvider);
+      expect(predicted.any((i) => i.id == 'predicted-1'), isTrue);
+    });
+
+    test('예측 리스트업에 포함돼도 planListProvider 전체 목록에서는 제외되지 않는다(additive)', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(planListProvider.notifier);
+
+      notifier.addItem(PlanItem(
+        id: 'repeat-2',
+        title: '매달 반복 항목',
+        date: DateTime(2027, 5, 1),
+        categoryKey: 'plan',
+        repeatConfig: const RepeatConfig(type: RepeatType.monthly),
+      ));
+
+      expect(
+        container.read(planListProvider).any((i) => i.id == 'repeat-2'),
+        isTrue,
+      );
+      expect(
+        container
+            .read(predictedPlanItemsProvider)
+            .any((i) => i.id == 'repeat-2'),
+        isTrue,
+      );
     });
   });
 
