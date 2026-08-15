@@ -12,7 +12,12 @@
           "package_name": "com.example.haruchip"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "932846129523-thk0m57ug48ff3hbn5necvd78eqqpbu9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBSnFXIZAXsqpsY_kmv2nTo5vHgHNcuZ-k"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "932846129523-thk0m57ug48ff3hbn5necvd78eqqpbu9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "932846129523-ltb00kpjgot5s78a9n43iar45mt50ove.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.haruchip"
+              }
+            }
+          ]
         }
       }
     }

@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -28,15 +25,9 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -56,13 +47,42 @@ class DefaultFirebaseOptions {
     projectId: 'haruchip-6a5aa',
     storageBucket: 'haruchip-6a5aa.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyB4GFccTv_R1H5HuMj5I7AhS3DgsXoRUbQ',
     appId: '1:932846129523:ios:ebc2c60e813be8e993f506',
     messagingSenderId: '932846129523',
     projectId: 'haruchip-6a5aa',
     storageBucket: 'haruchip-6a5aa.firebasestorage.app',
+    iosClientId: '932846129523-ltb00kpjgot5s78a9n43iar45mt50ove.apps.googleusercontent.com',
     iosBundleId: 'com.example.haruchip',
+  );
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyA4Ayr-F2qNMfauTEsSDpy7ykzeQlQiUcA',
+    appId: '1:932846129523:web:dd25c0173dc0e7c193f506',
+    messagingSenderId: '932846129523',
+    projectId: 'haruchip-6a5aa',
+    authDomain: 'haruchip-6a5aa.firebaseapp.com',
+    storageBucket: 'haruchip-6a5aa.firebasestorage.app',
+    measurementId: 'G-2E45MTKVR9',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyB4GFccTv_R1H5HuMj5I7AhS3DgsXoRUbQ',
+    appId: '1:932846129523:ios:ebc2c60e813be8e993f506',
+    messagingSenderId: '932846129523',
+    projectId: 'haruchip-6a5aa',
+    storageBucket: 'haruchip-6a5aa.firebasestorage.app',
+    iosClientId: '932846129523-ltb00kpjgot5s78a9n43iar45mt50ove.apps.googleusercontent.com',
+    iosBundleId: 'com.example.haruchip',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyA4Ayr-F2qNMfauTEsSDpy7ykzeQlQiUcA',
+    appId: '1:932846129523:web:678818f438abb1a493f506',
+    messagingSenderId: '932846129523',
+    projectId: 'haruchip-6a5aa',
+    authDomain: 'haruchip-6a5aa.firebaseapp.com',
+    storageBucket: 'haruchip-6a5aa.firebasestorage.app',
+    measurementId: 'G-GJHER1EBKB',
   );
 }
