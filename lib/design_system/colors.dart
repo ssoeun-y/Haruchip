@@ -37,4 +37,36 @@ class AppColors {
   static const Color practicalAccentMuted = Color(0xFFE4ECFF);
 
   static const Color danger = Color(0xFFE0523F);
+
+  // --- 프로토타입 팔레트 (haruchip_app.html — CLAUDE.md §5/§6) ---
+  // §5/§6 "모든 화면은 haruchip_app.html의 색상·톤을 따른다" 규칙에 따라
+  // 그 파일이 쓰는 Tailwind yellow/amber/gray 스케일 값을 그대로 옮겨왔다.
+  // 아직 이 팔레트로 옮겨가지 않은 기존 화면(로그인 등)은 위 코랄 계열
+  // 토큰을 계속 쓴다 — 전면 리테마는 이번 범위 밖이라 별도로 진행한다.
+  static const Color protoBackground = Color(0xFFFFFDF4);
+  static const Color protoStepLabel = Color(0xFFD97706); // amber-600
+  static const Color protoHeading = Color(0xFF111827); // gray-900
+  static const Color protoSubtitle = Color(0xFF6B7280); // gray-500
+  static const Color protoCardBg = Color(0xFFFFFFFF); // white
+  static const Color protoCardBorder = Color(0xFFF3F4F6); // gray-100
+  static const Color protoCardText = Color(0xFF4B5563); // gray-600
+  static const Color protoCardSelectedBg = Color(0xFFFEFCE8); // yellow-50
+  static const Color protoCardSelectedBorder = Color(0xFFFACC15); // yellow-400
+  static const Color protoCardSelectedText = Color(0xFF78350F); // amber-900
+  static const Color protoButtonBg = Color(0xFFFACC15); // yellow-400
+  static const Color protoButtonText = Color(0xFF451A03); // amber-950
+
+  // 대시보드 뷰모드 선택 화면(라디오형 카드)은 카테고리 카드와 선택 테두리
+  // 색이 다르다 — haruchip_app.html에서 그 화면만 border-yellow-300을 쓴다.
+  static const Color protoRadioSelectedBorder = Color(0xFFFDE68A); // yellow-300
+  static const Color protoRadioAccent = Color(0xFFEAB308); // yellow-500 (라디오 채움 색)
+  static const Color protoRadioUnselected = Color(0xFF9CA3AF); // gray-400 (라디오 테두리)
+
+  // 커플 화면 전용 핑크 톤 — haruchip_app.html의 커플 카드/커플룸(pink-50~700)을
+  // 그대로 옮겨왔다. 감성형 공통 토큰(emotionalAccent)과 별도로 두는 이유는
+  // html 원본이 커플에만 이 정확한 pink 스케일을 쓰기 때문이다(§5/§6).
+  static const Color protoCoupleBg = Color(0xFFFDF2F8); // pink-50
+  static const Color protoCoupleBgMuted = Color(0xFFFCE7F3); // pink-100
+  static const Color protoCoupleText = Color(0xFFDB2777); // pink-600
+  static const Color protoCoupleTextStrong = Color(0xFFBE185D); // pink-700
 }

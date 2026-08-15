@@ -43,3 +43,17 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 시크릿 관리 (CLAUDE.md §3) — 절대 평문 커밋 금지.
+# google-services.json / GoogleService-Info.plist(클라이언트 설정 파일,
+# flutterfire configure로 생성)는 Firebase 공식 가이드상 커밋해도 안전하므로
+# 여기 포함하지 않는다 — 실제 보호는 Firestore 보안 규칙과 API 키 제한으로
+# 한다. 여기서 막는 건 "서버 관리자 자격증명"에 가까운 파일들이다.
+env/dev.json
+env/prod.json
+functions/.env
+**/*serviceAccountKey.json
+**/*service-account*.json
+
+# firebase-tools가 실패 시 남기는 디버그 로그 — 커밋 대상 아님.
+firebase-debug.log
