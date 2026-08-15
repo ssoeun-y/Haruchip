@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// Firebase Storage 보안 규칙 — 카테고리&디데이 핸드오프 문서 §6 사진
+// 업로드(image_picker + firebase_storage) 구현에 맞춰 최초로 추가한다.
+// `firestore.rules`(보안 담당 소유)와 같은 기본 거부 원칙(CLAUDE.md §9
+// Broken Access Control)을 따른다: 업로드 경로는
+// `users/{uid}/uploads/...`(`lib/features/categories/services/
+// image_upload_service.dart`)로 고정돼 있고, 본인 uid 경로에만 쓸 수
+// 있다. 그 외 경로는 전부 거부.
+//
+// NOTE: `getDownloadURL()`이 돌려주는 URL은 토큰을 포함해 이 규칙과
+// 무관하게 접근 가능하다(Firebase Storage의 알려진 동작) — 즉 이 규칙은
+// SDK를 통한 직접 read/write만 통제하고, 이미 발급된 다운로드 URL 자체를
+// 비공개로 만들지는 못한다. 사진 자체를 완전히 비공개로 다뤄야 한다면
+// Cloud Functions 프록시 등 별도 설계가 필요하다 — 이번 단계 범위 밖이라
+// 보안 담당 리뷰 시 참고.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{uid}/uploads/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

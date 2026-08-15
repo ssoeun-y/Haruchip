@@ -11,9 +11,11 @@ import 'package:flutter/material.dart';
 /// 존재할 수 있다. 예: `categoryKey: 'exam'`으로 "정보처리기사"와 "토익"
 /// 두 인스턴스를 각각 만들 수 있고, 서로 다른 이름/아이콘/색을 가진다.
 ///
-/// 커스텀 범위는 이번 단계(카테고리 & 디데이 1~4단계)에서는 이름/아이콘/
-/// 색상까지만이다 — 타이포그래피(등록된 폰트 자산 없음)와 배경(그라데이션/
-/// 이미지/스티커, 별도 에셋 관리 트랙)은 다음 단계로 미룬다.
+/// 커스텀 범위는 이름/아이콘/색상 + (감성형 한정) 배경 사진 하나까지다 —
+/// 타이포그래피와 그라데이션/스티커 배경은 폰트·에셋 관리 트랙이 아직
+/// 없어 다음 단계로 미룬다. [backgroundImageUrl]은 핸드오프 문서 §6
+/// "사진 업로드 확정"으로 나중에 추가된 필드라 이름/아이콘/색상보다
+/// 뒤늦게 생겼다.
 @immutable
 class Category {
   const Category({
@@ -23,6 +25,7 @@ class Category {
     required this.emoji,
     required this.colorHex,
     required this.createdAt,
+    this.backgroundImageUrl,
   });
 
   final String id;
@@ -44,6 +47,11 @@ class Category {
 
   final DateTime createdAt;
 
+  /// 배경 사진 URL(§5 "감성형: 배경 자유", §6 사진 업로드) — 감성형
+  /// 카테고리(couple/solo/birthday/pet/baby)만 설정 UI에 노출한다.
+  /// `ImageUploadService`가 Storage에 올리고 돌려준 다운로드 URL 그대로.
+  final String? backgroundImageUrl;
+
   Category copyWith({
     String? id,
     String? categoryKey,
@@ -51,6 +59,7 @@ class Category {
     String? emoji,
     String? colorHex,
     DateTime? createdAt,
+    String? backgroundImageUrl,
   }) {
     return Category(
       id: id ?? this.id,
@@ -59,6 +68,7 @@ class Category {
       emoji: emoji ?? this.emoji,
       colorHex: colorHex ?? this.colorHex,
       createdAt: createdAt ?? this.createdAt,
+      backgroundImageUrl: backgroundImageUrl ?? this.backgroundImageUrl,
     );
   }
 }

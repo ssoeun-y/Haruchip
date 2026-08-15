@@ -6,6 +6,7 @@ import '../../../design_system/typography.dart';
 import '../../categories/data/category_types.dart';
 import '../../categories/models/category.dart';
 import '../../categories/providers/category_provider.dart';
+import '../../categories/services/image_upload_service.dart';
 import '../../onboarding/models/onboarding_category.dart';
 
 /// "카테고리 추가하기" 모달 — CLAUDE.md §5("+ 새 카테고리 추가하기" 진입점),
@@ -55,6 +56,12 @@ class _AddCategoryDashboardModalState
   String? _selectedEmoji;
   Color _selectedColor = AppColors.kFreeColorPresets.first;
 
+  /// 배경 사진(§5 감성형 한정, §6 사진 업로드) — 업로드 중엔 null이 아니라
+  /// [_uploadingBackground]로 별도 로딩 상태를 둔다(업로드 실패해도 이전
+  /// 값을 잃지 않도록).
+  String? _backgroundImageUrl;
+  bool _uploadingBackground = false;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -67,11 +74,37 @@ class _AddCategoryDashboardModalState
       _nameController.clear();
       _selectedEmoji = type.emoji;
       _selectedColor = AppColors.kFreeColorPresets.first;
+      _backgroundImageUrl = null;
     });
   }
 
   void _backToTypeSelection() {
     setState(() => _selectedType = null);
+  }
+
+  Future<void> _pickBackgroundImage() async {
+    setState(() => _uploadingBackground = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final url = await ref
+          .read(imageUploadServiceProvider)
+          .pickAndUpload(folder: 'category-background');
+      if (!mounted) return;
+      if (url == null) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('⚠️ 로그인 상태를 확인하거나 사진 선택을 다시 시도해주세요.')),
+        );
+      } else {
+        setState(() => _backgroundImageUrl = url);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('⚠️ 사진 업로드에 실패했습니다. 다시 시도해주세요.')),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingBackground = false);
+    }
   }
 
   void _handleAdd(BuildContext context) {
@@ -87,6 +120,7 @@ class _AddCategoryDashboardModalState
           name: name,
           emoji: emoji,
           colorHex: colorToHex(_selectedColor),
+          backgroundImageUrl: _backgroundImageUrl,
         );
 
     final messenger = ScaffoldMessenger.of(context);
@@ -347,6 +381,59 @@ class _AddCategoryDashboardModalState
               ),
           ],
         ),
+        if (type.group == CategoryGroup.emotional) ...[
+          const SizedBox(height: 16),
+          Text(
+            '배경 사진 (선택)',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.protoSubtitle,
+            ),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _uploadingBackground ? null : _pickBackgroundImage,
+            child: Container(
+              width: double.infinity,
+              height: 96,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(14),
+                image: _backgroundImageUrl == null
+                    ? null
+                    : DecorationImage(
+                        image: NetworkImage(_backgroundImageUrl!),
+                        fit: BoxFit.cover,
+                      ),
+              ),
+              child: _uploadingBackground
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : _backgroundImageUrl == null
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.add_photo_alternate_outlined,
+                              size: 22,
+                              color: AppColors.protoStepLabel,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '갤러리에서 사진 선택',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.protoSubtitle,
+                              ),
+                            ),
+                          ],
+                        )
+                      : null,
+            ),
+          ),
+        ],
       ],
     );
   }

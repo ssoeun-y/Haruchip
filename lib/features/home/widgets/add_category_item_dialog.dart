@@ -6,8 +6,14 @@ import '../../../design_system/typography.dart';
 import '../../categories/data/category_types.dart';
 import '../../categories/logic/repeat_rule.dart';
 import '../../categories/models/exam_timeline.dart';
+import '../../categories/services/image_upload_service.dart';
 import '../../plan/models/plan_item.dart';
 import '../../plan/providers/plan_provider.dart';
+
+/// [categoryKey]가 프로필 사진 업로드 UI(§5.5 아기 "프로필 사진 원형
+/// 프레임", §5.6 반려동물 "사진+이름 카드형 프로필")를 노출해야 하는지.
+bool _hasPhotoUpload(String categoryKey) =>
+    categoryKey == 'baby' || categoryKey == 'pet';
 
 /// "항목 추가" 모달 — CLAUDE.md §8(대시보드 카테고리 카드 "+ 추가",
 /// 캘린더 탭 "+ 일정 추가").
@@ -106,6 +112,9 @@ class _AddCategoryItemDialogState
   bool _syncNaver = false;
   bool _syncHaruchip = false;
 
+  String? _photoUrl;
+  bool _uploadingPhoto = false;
+
   /// 시험 카테고리(§5.4) 전용 타임라인 입력 상태 — stage별로 선택한 날짜만
   /// 채워지고, 나머지는 null(미정)로 남는다.
   final Map<ExamStage, DateTime?> _examTimeline = {
@@ -153,6 +162,31 @@ class _AddCategoryItemDialogState
     }
   }
 
+  Future<void> _pickPhoto() async {
+    setState(() => _uploadingPhoto = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final url = await ref
+          .read(imageUploadServiceProvider)
+          .pickAndUpload(folder: widget.categoryKey);
+      if (!mounted) return;
+      if (url == null) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('⚠️ 로그인 상태를 확인하거나 사진 선택을 다시 시도해주세요.')),
+        );
+      } else {
+        setState(() => _photoUrl = url);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('⚠️ 사진 업로드에 실패했습니다. 다시 시도해주세요.')),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
   void _toggleWeekday(int weekday) {
     setState(() {
       if (_selectedWeekdays.contains(weekday)) {
@@ -194,6 +228,7 @@ class _AddCategoryItemDialogState
               haruchip: _syncHaruchip,
             ),
             examTimeline: examTimelineEntries,
+            photoUrl: _photoUrl,
           ),
         );
     final messenger = ScaffoldMessenger.of(context);
@@ -277,6 +312,46 @@ class _AddCategoryItemDialogState
                       ),
                     ),
                   ),
+                  if (_hasPhotoUpload(widget.categoryKey)) ...[
+                    const SizedBox(height: 16),
+                    _sectionLabel('사진 (선택)'),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: GestureDetector(
+                        onTap: _uploadingPhoto ? null : _pickPhoto,
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceMuted,
+                            shape: BoxShape.circle,
+                            image: _photoUrl == null
+                                ? null
+                                : DecorationImage(
+                                    image: NetworkImage(_photoUrl!),
+                                    fit: BoxFit.cover,
+                                  ),
+                          ),
+                          child: _uploadingPhoto
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : _photoUrl == null
+                                  ? const Icon(
+                                      Icons.add_photo_alternate_outlined,
+                                      size: 22,
+                                      color: AppColors.protoStepLabel,
+                                    )
+                                  : null,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   _sectionLabel('날짜'),
                   const SizedBox(height: 6),

@@ -118,10 +118,15 @@ users/{uid}/categoryItems/{itemId}
 
 users/{uid}/categories/{categoryId}  (카테고리 인스턴스 — 동일 categoryKey 다중 허용, §5)
   - categoryKey, name, emoji, colorHex(무료 프리셋 7개 중 하나, §6), createdAt
+  - backgroundImageUrl(선택, 감성형만) — 사진 업로드 흐름은 §6 참고
   > 클라이언트 쪽 구현은 `lib/features/categories/`(Category 모델·provider) +
   > `lib/features/plan/models/plan_item.dart`(displayMode/repeatConfig/
-  > calendarSync로 확장된 항목 모델) 참고 — 아직 Firestore 미연동, 로컬
-  > Riverpod 상태로만 존재.
+  > calendarSync/photoUrl로 확장된 항목 모델) +
+  > `lib/features/military/models/military_service.dart`(군대 카테고리
+  > 전용, branch 포함) 참고 — 아직 Firestore 미연동, 로컬 Riverpod 상태로만
+  > 존재. 사진 업로드(`lib/features/categories/services/
+  > image_upload_service.dart`)는 Firebase Storage에 실제로 쓰는 유일한
+  > 예외 — 업로드 경로 권한은 `storage.rules`(신규, repo 루트)가 통제한다.
 
 coupleRooms/{roomId}
   - members: [uid1, uid2]

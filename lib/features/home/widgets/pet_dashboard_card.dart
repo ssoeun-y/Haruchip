@@ -99,6 +99,15 @@ class PetDashboardCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
+                    // 카드형 프로필(§5.6 "사진+이름 카드형 프로필") — 사진이
+                    // 있는 항목만 이름 앞에 작은 원형 썸네일을 붙인다.
+                    if (item.photoUrl != null) ...[
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundImage: NetworkImage(item.photoUrl!),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     Expanded(
                       child: Text(
                         item.title,

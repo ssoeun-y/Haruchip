@@ -58,5 +58,9 @@
 			</array>
 		</dict>
 	</array>
+	<!-- image_picker(카테고리 배경/아기·반려동물 프로필 사진, 카테고리&디데이
+	     핸드오프 문서 §6)가 갤러리 접근 시 띄우는 권한 안내 문구. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>사진첩에서 카테고리 배경/프로필 사진을 선택하기 위해 접근합니다.</string>
 </dict>
 </plist>
