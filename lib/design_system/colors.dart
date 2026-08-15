@@ -69,4 +69,21 @@ class AppColors {
   static const Color protoCoupleBgMuted = Color(0xFFFCE7F3); // pink-100
   static const Color protoCoupleText = Color(0xFFDB2777); // pink-600
   static const Color protoCoupleTextStrong = Color(0xFFBE185D); // pink-700
+
+  /// D-day/캘린더 등록 시 색상은 무료 프리셋 7개로 고정한다(CLAUDE.md §6).
+  /// 프리셋 밖 커스텀 컬러피커는 프리미엄 유료 기능이라 이번 범위(카테고리
+  /// 커스텀 1~4단계)에서는 만들지 않는다 — 카테고리 생성 폼은 이 7개
+  /// 배열만 스와치로 노출하면 된다.
+  ///
+  /// haruchip_app.html이 쓰는 Tailwind 스케일(§5/§6 톤 재현 규칙)에서
+  /// 채도 있는 대표색 7개를 뽑았다: 레드/오렌지/옐로/그린/블루/퍼플/핑크.
+  static const List<Color> kFreeColorPresets = [
+    Color(0xFFEF4444), // red-500
+    Color(0xFFF97316), // orange-500
+    Color(0xFFEAB308), // yellow-500 (protoRadioAccent와 동일 톤)
+    Color(0xFF22C55E), // green-500
+    Color(0xFF3B82F6), // blue-500
+    Color(0xFFA855F7), // purple-500
+    Color(0xFFEC4899), // pink-500
+  ];
 }

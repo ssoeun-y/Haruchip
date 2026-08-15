@@ -42,11 +42,26 @@ class AddPlanItemDialog extends ConsumerStatefulWidget {
   ConsumerState<AddPlanItemDialog> createState() => _AddPlanItemDialogState();
 }
 
+const _kPriorityOptions = <(PlanPriority value, String labelKo)>[
+  (PlanPriority.low, '낮음'),
+  (PlanPriority.medium, '보통'),
+  (PlanPriority.high, '높음'),
+];
+
+const _kKanbanStatusOptions = <(KanbanStatus value, String labelKo)>[
+  (KanbanStatus.todo, '할일'),
+  (KanbanStatus.inProgress, '진행중'),
+  (KanbanStatus.done, '완료'),
+];
+
 class _AddPlanItemDialogState extends ConsumerState<AddPlanItemDialog> {
   final _titleController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
   String _categoryKey = _kPlanCategoryOptions.first.$1;
   bool _repeat = false;
+  PlanPriority _priority = PlanPriority.medium;
+  KanbanStatus _kanbanStatus = KanbanStatus.todo;
+  TimeOfDay? _deadlineTime;
 
   @override
   void dispose() {
@@ -69,9 +84,20 @@ class _AddPlanItemDialogState extends ConsumerState<AddPlanItemDialog> {
     }
   }
 
+  Future<void> _pickDeadlineTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _deadlineTime ?? TimeOfDay.now(),
+    );
+    if (picked != null && mounted) {
+      setState(() => _deadlineTime = picked);
+    }
+  }
+
   void _handleAdd() {
     final title = _titleController.text.trim();
     if (title.isEmpty) return;
+    final isPlan = _categoryKey == 'plan';
     ref.read(planListProvider.notifier).addItem(
           PlanItem(
             id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -79,6 +105,9 @@ class _AddPlanItemDialogState extends ConsumerState<AddPlanItemDialog> {
             date: _selectedDate,
             categoryKey: _categoryKey,
             repeat: _repeat,
+            priority: _priority,
+            kanbanStatus: isPlan ? _kanbanStatus : KanbanStatus.todo,
+            deadlineTime: isPlan ? _deadlineTime : null,
           ),
         );
     Navigator.of(context).pop(true);
@@ -212,6 +241,87 @@ class _AddPlanItemDialogState extends ConsumerState<AddPlanItemDialog> {
                     ),
                 ],
               ),
+              const SizedBox(height: 16),
+              Text(
+                '우선순위',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.protoSubtitle,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final option in _kPriorityOptions)
+                    _CategoryChip(
+                      label: option.$2,
+                      selected: _priority == option.$1,
+                      onTap: () => setState(() => _priority = option.$1),
+                    ),
+                ],
+              ),
+              if (_categoryKey == 'plan') ...[
+                const SizedBox(height: 16),
+                Text(
+                  '칸반 상태',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.protoSubtitle,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final option in _kKanbanStatusOptions)
+                      _CategoryChip(
+                        label: option.$2,
+                        selected: _kanbanStatus == option.$1,
+                        onTap: () =>
+                            setState(() => _kanbanStatus = option.$1),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '마감 시간 (선택)',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.protoSubtitle,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                InkWell(
+                  onTap: _pickDeadlineTime,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.schedule_rounded,
+                          size: 18,
+                          color: AppColors.protoStepLabel,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _deadlineTime == null
+                              ? '시간 설정 안 함'
+                              : '${_deadlineTime!.hour.toString().padLeft(2, '0')}:${_deadlineTime!.minute.toString().padLeft(2, '0')}',
+                          style: AppTypography.cardLabel.copyWith(
+                            color: AppColors.protoHeading,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               InkWell(
                 onTap: () => setState(() => _repeat = !_repeat),

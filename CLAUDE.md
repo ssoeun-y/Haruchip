@@ -113,8 +113,15 @@ users/{uid}
   - name, email, avatarEmoji, selectedCategories: []
 
 users/{uid}/categoryItems/{itemId}
-  - categoryKey: "exam" | "birthday" | "pet" | "plan" | "solo" | "military" | "couple"
+  - categoryKey: "exam" | "birthday" | "pet" | "plan" | "solo" | "military" | "couple" | "baby"
   - title, date, repeat(bool), colorHex, visibility("public"|"private")
+
+users/{uid}/categories/{categoryId}  (카테고리 인스턴스 — 동일 categoryKey 다중 허용, §5)
+  - categoryKey, name, emoji, colorHex(무료 프리셋 7개 중 하나, §6), createdAt
+  > 클라이언트 쪽 구현은 `lib/features/categories/`(Category 모델·provider) +
+  > `lib/features/plan/models/plan_item.dart`(displayMode/repeatConfig/
+  > calendarSync로 확장된 항목 모델) 참고 — 아직 Firestore 미연동, 로컬
+  > Riverpod 상태로만 존재.
 
 coupleRooms/{roomId}
   - members: [uid1, uid2]

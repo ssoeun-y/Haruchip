@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
+import '../../categories/models/category.dart';
+import '../../categories/providers/category_provider.dart';
 import '../../plan/models/plan_item.dart';
 import '../../plan/providers/plan_provider.dart';
 
@@ -28,7 +31,7 @@ String _formatYmd(DateTime date) {
 /// "감성형"으로 분류하는 점에 맞춰, 이미 정의된 감성형 공용 액센트
 /// (`AppColors.emotionalAccent`/`emotionalAccentMuted`)로 대체했다 —
 /// 정확한 보라색 톤은 아니라는 점을 최종 보고에 남긴다.
-class BirthdayDashboardCard extends StatelessWidget {
+class BirthdayDashboardCard extends ConsumerWidget {
   const BirthdayDashboardCard({
     super.key,
     required this.items,
@@ -39,7 +42,17 @@ class BirthdayDashboardCard extends StatelessWidget {
   final VoidCallback onAdd;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final categories = ref.watch(categoryListProvider);
+    Category? categoryFor(PlanItem item) {
+      final instanceId = item.categoryInstanceId;
+      if (instanceId == null) return null;
+      for (final category in categories) {
+        if (category.id == instanceId) return category;
+      }
+      return null;
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -135,7 +148,7 @@ class BirthdayDashboardCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        '${item.title} (${_formatYmd(item.date)})',
+                        '${categoryFor(item)?.emoji ?? '🎂'} ${item.title} (${_formatYmd(item.date)})',
                         style: AppTypography.caption.copyWith(
                           color: AppColors.protoCardText,
                           fontWeight: FontWeight.w600,

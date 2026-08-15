@@ -4,6 +4,7 @@ import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
 import '../../plan/models/plan_item.dart';
 import '../../plan/providers/plan_provider.dart';
+import 'exam_timeline_row.dart';
 
 /// 대시보드 시험/자격증 카드 — CLAUDE.md §8(대시보드 카테고리 카드).
 ///
@@ -121,46 +122,55 @@ class ExamDashboardCard extends StatelessWidget {
                   color: AppColors.protoCardSelectedBg.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        item.title,
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.protoCardText,
-                          fontWeight: FontWeight.w600,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.protoCardText,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.protoButtonBg,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        dDayLabel(item.date),
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.protoButtonText,
-                          fontWeight: FontWeight.w700,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.protoButtonBg,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            dDayLabel(item.date),
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.protoButtonText,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    InkWell(
-                      onTap: () => onSyncItem(item),
-                      child: Text(
-                        '연동',
-                        style: AppTypography.caption.copyWith(
-                          fontSize: 10,
-                          color: AppColors.protoSubtitle,
-                          decoration: TextDecoration.underline,
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: () => onSyncItem(item),
+                          child: Text(
+                            '연동',
+                            style: AppTypography.caption.copyWith(
+                              fontSize: 10,
+                              color: AppColors.protoSubtitle,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
+                    if (item.examTimeline.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      ExamTimelineRow(entries: item.examTimeline),
+                    ],
                   ],
                 ),
               ),

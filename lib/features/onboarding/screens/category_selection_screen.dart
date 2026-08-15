@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
+import '../../categories/providers/category_provider.dart';
 import '../data/onboarding_categories.dart';
 import '../providers/category_selection_provider.dart';
 import '../widgets/category_selection_card.dart';
@@ -44,6 +45,12 @@ class CategorySelectionScreen extends ConsumerWidget {
 
     void handleNext() {
       if (!canProceed) return;
+
+      final types = kOnboardingCategories
+          .where((c) => selectedKeys.contains(c.key))
+          .map((c) => (key: c.key, labelKo: c.labelKo, emoji: c.emoji));
+      ref.read(categoryListProvider.notifier).seedFromKeys(types);
+
       if (onNext != null) {
         onNext!();
         return;

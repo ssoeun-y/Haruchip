@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "932846129523-611us7h41cmmao0h07ma9kei2el46e2q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.haruchip",
+            "certificate_hash": "6aa157e88272cf556e02db753b67dd05cd2dc7ad"
+          }
+        },
+        {
           "client_id": "932846129523-thk0m57ug48ff3hbn5necvd78eqqpbu9.apps.googleusercontent.com",
           "client_type": 3
         }

@@ -3,15 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/colors.dart';
 import '../../calendar/widgets/calendar_sync_dialog.dart';
+import '../../categories/providers/category_provider.dart';
 import '../../couple/providers/couple_provider.dart';
-import '../../onboarding/data/onboarding_categories.dart';
-import '../../onboarding/providers/category_selection_provider.dart';
+import '../../military/widgets/military_dashboard_card.dart';
 import '../../onboarding/providers/dashboard_view_mode_provider.dart';
 import '../../plan/providers/plan_provider.dart';
 import '../providers/main_tab_provider.dart';
 import '../widgets/add_category_dashboard_card.dart';
 import '../widgets/add_category_dashboard_modal.dart';
 import '../widgets/add_category_item_dialog.dart';
+import '../widgets/baby_dashboard_card.dart';
 import '../widgets/birthday_dashboard_card.dart';
 import '../widgets/couple_dashboard_card.dart';
 import '../widgets/dashboard_greeting_card.dart';
@@ -31,8 +32,10 @@ import '../widgets/pet_dashboard_card.dart';
 /// ("김하루"/"🌻")을 그대로 하드코딩한다 — 실제 로그인 연동은 이 담당자
 /// 범위 밖이다.
 ///
-/// 어떤 카드를 보여줄지는 `categorySelectionProvider`(온보딩에서 고른
-/// 카테고리 Set)를 그대로 재사용한다.
+/// 어떤 카드를 보여줄지는 `categoryListProvider`(사용자가 만든
+/// [Category] 인스턴스 목록)를 기준으로 판단한다 — 전용 카드(커플/시험/
+/// 생일/반려동물)는 `hasCategoryOfKeyProvider(key)`로, 나머지는 인스턴스별
+/// 범용 카드로 그린다.
 ///
 /// (2부 연결) 1부가 남긴 스낵바 스텁을 모두 실제 기능으로 교체했다:
 /// - 커플 카드 탭 → `mainTabIndexProvider`를 3(우리의방)으로 바꿔 메인
@@ -49,14 +52,13 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedCategories = ref.watch(categorySelectionProvider);
     final viewMode = ref.watch(resolvedDashboardViewModeProvider);
     final totalDays = ref.watch(totalDaysTogetherProvider);
     final anniversaries = ref.watch(upcomingAnniversariesProvider);
 
     final cards = <Widget>[];
 
-    if (selectedCategories.contains('couple')) {
+    if (ref.watch(hasCategoryOfKeyProvider('couple'))) {
       cards.add(
         CoupleDashboardCard(
           totalDays: totalDays,
@@ -70,7 +72,7 @@ class DashboardScreen extends ConsumerWidget {
       );
     }
 
-    if (selectedCategories.contains('exam')) {
+    if (ref.watch(hasCategoryOfKeyProvider('exam'))) {
       final examItems = ref.watch(planItemsByCategoryProvider('exam'));
       cards.add(
         ExamDashboardCard(
@@ -82,7 +84,7 @@ class DashboardScreen extends ConsumerWidget {
       );
     }
 
-    if (selectedCategories.contains('birthday')) {
+    if (ref.watch(hasCategoryOfKeyProvider('birthday'))) {
       final birthdayItems = ref.watch(planItemsByCategoryProvider('birthday'));
       cards.add(
         BirthdayDashboardCard(
@@ -93,17 +95,29 @@ class DashboardScreen extends ConsumerWidget {
       );
     }
 
-    if (selectedCategories.contains('pet')) {
+    if (ref.watch(hasCategoryOfKeyProvider('pet'))) {
       final petItems = ref.watch(planItemsByCategoryProvider('pet'));
-      cards.add(PetDashboardCard(item: petItems.isEmpty ? null : petItems.first));
+      cards.add(PetDashboardCard(items: petItems));
     }
 
-    // 전용 카드가 없는 나머지 카테고리(솔로/군대/계획 등) — 범용 카드로.
-    const dedicatedKeys = {'couple', 'exam', 'birthday', 'pet'};
-    for (final category in kOnboardingCategories) {
-      if (dedicatedKeys.contains(category.key)) continue;
-      if (!selectedCategories.contains(category.key)) continue;
-      final items = ref.watch(planItemsByCategoryProvider(category.key));
+    if (ref.watch(hasCategoryOfKeyProvider('military'))) {
+      cards.add(const MilitaryDashboardCard());
+    }
+
+    if (ref.watch(hasCategoryOfKeyProvider('baby'))) {
+      final babyItems = ref.watch(planItemsByCategoryProvider('baby'));
+      cards.add(BabyDashboardCard(items: babyItems));
+    }
+
+    // 전용 카드가 없는 나머지 카테고리(솔로/계획 등) — 범용 카드로.
+    // 사용자가 만든 카테고리 인스턴스별로 카드를 하나씩 그린다(다중
+    // 인스턴스 허용 — CLAUDE.md §5).
+    const dedicatedKeys = {'couple', 'exam', 'birthday', 'pet', 'military', 'baby'};
+    final categories = ref.watch(categoryListProvider);
+    for (final category in categories) {
+      if (dedicatedKeys.contains(category.categoryKey)) continue;
+      final items =
+          ref.watch(planItemsByCategoryInstanceProvider(category.id));
       cards.add(
         GenericCategoryDashboardCard(category: category, items: items),
       );

@@ -46,6 +46,15 @@ class PlanItemCard extends StatelessWidget {
       ),
       child: Row(
         children: [
+          Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: priorityColor(item.priority),
+              shape: BoxShape.circle,
+            ),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,6 +78,15 @@ class PlanItemCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         '· 매년 반복',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.protoSubtitle,
+                        ),
+                      ),
+                    ],
+                    if (item.deadlineTime != null) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '· ${item.deadlineTime!.hour.toString().padLeft(2, '0')}:${item.deadlineTime!.minute.toString().padLeft(2, '0')} 마감',
                         style: AppTypography.caption.copyWith(
                           color: AppColors.protoSubtitle,
                         ),

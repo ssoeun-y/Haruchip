@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
-import '../../onboarding/models/onboarding_category.dart';
+import '../../categories/models/category.dart';
 import '../../plan/models/plan_item.dart';
 import '../../plan/providers/plan_provider.dart';
+import 'add_category_item_dialog.dart';
 
 /// 대시보드 "범용 카테고리" 카드 — CLAUDE.md §8(대시보드 카테고리 카드).
 ///
@@ -13,12 +14,15 @@ import '../../plan/providers/plan_provider.dart';
 /// 생일/반려동물처럼 전용 카드가 없는 카테고리(솔로/군대/계획 등)가
 /// 이 카드로 대체된다.
 ///
-/// 원본의 `renderGenericCategoryCard`는 카테고리 종류(ddayDate/
-/// dischargeDate/plans)에 따라 분기했지만, 우리 쪽은 모든 카테고리가
-/// 이미 `PlanItem` 리스트(`planItemsByCategoryProvider(key)`)로 통일돼
-/// 있어 분기 없이 항목 리스트를 그대로 순회한다 — 이게 원본의 여러
-/// 분기를 하나로 정리한 의도적인 차이다(로직 담당자 provider 스펙에
-/// 맞춘 것).
+/// 카테고리 & 디데이 커스텀 4단계: 다중 인스턴스 지원을 위해 [category]가
+/// 온보딩 타입([OnboardingCategory])이 아니라 사용자가 만든 [Category]
+/// 인스턴스를 직접 받는다 — 같은 categoryKey라도 인스턴스별로 다른 이름/
+/// 아이콘/색과 서로 다른 항목 목록을 보여줄 수 있다
+/// (`planItemsByCategoryInstanceProvider(category.id)`가 [items]를 채운다).
+///
+/// 헤더 우측에 "+ 추가" 아이콘 버튼을 추가해 [showAddCategoryItemDialog]를
+/// 이 인스턴스([category.id])에 귀속해서 연다(exam/birthday 카드와 같은
+/// 패턴).
 class GenericCategoryDashboardCard extends StatelessWidget {
   const GenericCategoryDashboardCard({
     super.key,
@@ -26,7 +30,7 @@ class GenericCategoryDashboardCard extends StatelessWidget {
     required this.items,
   });
 
-  final OnboardingCategory category;
+  final Category category;
   final List<PlanItem> items;
 
   @override
@@ -54,10 +58,28 @@ class GenericCategoryDashboardCard extends StatelessWidget {
                 child: Text(category.emoji, style: const TextStyle(fontSize: 14)),
               ),
               const SizedBox(width: 8),
-              Text(
-                category.labelKo,
-                style: AppTypography.cardLabel.copyWith(
-                  color: AppColors.protoHeading,
+              Expanded(
+                child: Text(
+                  category.name,
+                  style: AppTypography.cardLabel.copyWith(
+                    color: AppColors.protoHeading,
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: () => showAddCategoryItemDialog(
+                  context,
+                  categoryKey: category.categoryKey,
+                  categoryInstanceId: category.id,
+                ),
+                borderRadius: BorderRadius.circular(999),
+                child: const Padding(
+                  padding: EdgeInsets.all(2),
+                  child: Icon(
+                    Icons.add_circle_outline,
+                    size: 20,
+                    color: AppColors.protoStepLabel,
+                  ),
                 ),
               ),
             ],
@@ -106,7 +128,7 @@ class GenericCategoryDashboardCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        dDayLabel(item.date),
+                        displayLabel(item),
                         style: AppTypography.caption.copyWith(
                           color: AppColors.protoStepLabel,
                           fontWeight: FontWeight.w700,

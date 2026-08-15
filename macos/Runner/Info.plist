@@ -28,5 +28,18 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<!-- 구글 로그인 콜백 수신용 URL 스킴. 값은
+	     GoogleService-Info.plist의 REVERSED_CLIENT_ID와 동일해야 한다. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.932846129523-ltb00kpjgot5s78a9n43iar45mt50ove</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
