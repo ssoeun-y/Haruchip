@@ -65,6 +65,17 @@ final planItemsByCategoryInstanceProvider =
       .toList();
 });
 
+/// "예측 리스트업" 섹션 — 디데이 추가 화면 명세 §3: `repeat.type != none`
+/// 이거나 `isPredicted == true`인 항목은 항상 이 섹션에 노출된다. 일반
+/// 목록에서 제외하지 않는 **추가(additive)** 노출이라 [planListProvider]
+/// 자체는 건드리지 않고 필터링된 뷰만 별도로 만든다.
+final predictedPlanItemsProvider = Provider<List<PlanItem>>((ref) {
+  return ref
+      .watch(planListProvider)
+      .where((item) => item.repeatConfig.isRepeating || item.isPredicted)
+      .toList();
+});
+
 /// haruchip_app.html의 daysUntil() 포팅.
 /// 'D-n'(미래) / 'D-day'(오늘) / 'D+n'(지남) 문자열을 반환한다.
 String dDayLabel(DateTime date) {

@@ -39,6 +39,18 @@ const List<OnboardingCategory> kCategoryTypes = [
   ),
 ];
 
+/// 디데이 추가 화면의 구글 캘린더 연동 토글 초깃값(카테고리별) — 디데이
+/// 추가 화면 명세 §3 예시("시험/계획 카테고리는 기본 ON, 커플/생일은
+/// 기본 OFF")를 그대로 반영했다. 문서 자체가 "추후 확정"이라고 명시해서
+/// 여기 없는 categoryKey는 전부 기본 OFF로 취급한다(호출부가
+/// `kDefaultGoogleCalendarSync[key] ?? false`로 읽는다).
+const Map<String, bool> kDefaultGoogleCalendarSync = {
+  'exam': true,
+  'plan': true,
+  'couple': false,
+  'birthday': false,
+};
+
 /// [categoryKey]에 해당하는 [OnboardingCategory]를 찾는다. 못 찾으면
 /// null(호출부가 'custom'류 기본값으로 대체).
 OnboardingCategory? categoryTypeOf(String categoryKey) {

@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
+import '../../calendar/providers/schedule_room_provider.dart';
 import '../../categories/data/category_types.dart';
 import '../../categories/logic/repeat_rule.dart';
 import '../../categories/models/exam_timeline.dart';
 import '../../categories/services/image_upload_service.dart';
+import '../../onboarding/providers/calendar_integration_provider.dart';
 import '../../plan/models/plan_item.dart';
 import '../../plan/providers/plan_provider.dart';
 
@@ -56,11 +58,17 @@ String _titleFor(String categoryKey) {
     case 'pet':
       return '반려동물 기록 추가';
     case 'plan':
-      return '일정 추가';
+      return '계획 추가';
     default:
       return '항목 추가';
   }
 }
+
+const List<({PlanPriority value, String label})> _priorityOptions = [
+  (value: PlanPriority.low, label: '낮음'),
+  (value: PlanPriority.medium, label: '보통'),
+  (value: PlanPriority.high, label: '높음'),
+];
 
 const List<({DdayDisplayMode mode, String label})> _displayModeOptions = [
   (mode: DdayDisplayMode.dday, label: 'D-Day'),
@@ -110,7 +118,8 @@ class _AddCategoryItemDialogState
 
   bool _syncGoogle = false;
   bool _syncNaver = false;
-  bool _syncHaruchip = false;
+
+  String? _roomLink;
 
   String? _photoUrl;
   bool _uploadingPhoto = false;
@@ -121,12 +130,21 @@ class _AddCategoryItemDialogState
     for (final stage in ExamStage.values) stage: null,
   };
 
+  /// 계획(plan) 카테고리 전용(§5.7) — `PlanScreen`이 이 다이얼로그로
+  /// 통합되면서 옮겨왔다. `PlanItem.priority` 모델 주석대로 plan 카테고리
+  /// UI에만 노출한다(칸반 상태는 생성 시점엔 항상 '할일'로 시작하고,
+  /// `KanbanBoard` 카드를 탭해 옮기는 방식이 이미 있어 여기서 다시 고를
+  /// 필요는 없다).
+  PlanPriority _priority = PlanPriority.medium;
+  TimeOfDay? _deadlineTime;
+
   @override
   void initState() {
     super.initState();
     _repeatType = widget.categoryKey == 'birthday'
         ? RepeatConfig.yearlyDefault.type
         : RepeatConfig.none.type;
+    _syncGoogle = kDefaultGoogleCalendarSync[widget.categoryKey] ?? false;
   }
 
   @override
@@ -147,6 +165,16 @@ class _AddCategoryItemDialogState
     );
     if (picked != null && mounted) {
       setState(() => _selectedDate = picked);
+    }
+  }
+
+  Future<void> _pickDeadlineTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _deadlineTime ?? TimeOfDay.now(),
+    );
+    if (picked != null && mounted) {
+      setState(() => _deadlineTime = picked);
     }
   }
 
@@ -197,6 +225,86 @@ class _AddCategoryItemDialogState
     });
   }
 
+  /// 구글 캘린더 토글 — 켤 때 [calendarIntegrationProvider](§7-4 "카테고리별
+  /// 기본값 저장 방식")에 연동 여부가 없으면 그 자리에서 연동 확인 팝업을
+  /// 띄운다(디데이 추가 화면 명세 §3 "토글을 ON으로 켜는 시점에 로그인이
+  /// 안 되어 있으면 그때 팝업"). 실제 OAuth 연동은 보류 트랙이라, 여기서는
+  /// "연동 의사"만 [calendarIntegrationProvider]에 기록한다.
+  Future<void> _handleGoogleToggle(bool value) async {
+    if (!value) {
+      setState(() => _syncGoogle = false);
+      return;
+    }
+    if (ref.read(calendarIntegrationProvider).contains('google')) {
+      setState(() => _syncGoogle = true);
+      return;
+    }
+    final confirmed = await _showConnectDialog(
+      title: '구글 캘린더 연동이 필요해요',
+      message: '이 항목을 구글 캘린더에도 표시하려면 먼저 구글 캘린더 연동을 켜야 해요.',
+      confirmLabel: '연동하기',
+    );
+    if (!mounted || confirmed != true) return;
+    ref.read(calendarIntegrationProvider.notifier).toggle('google');
+    setState(() => _syncGoogle = true);
+  }
+
+  /// 네이버 캘린더 토글 — 실제 네이버 로그인이 아직 구현되지 않아(CLAUDE.md
+  /// §7 보류 트랙) 연동 확인 팝업을 눌러도 토글을 켤 수는 없다. 안내만
+  /// 보여준다("네이버 로그인 연동 완료 후 활성화").
+  Future<void> _handleNaverToggle(bool value) async {
+    if (!value) {
+      setState(() => _syncNaver = false);
+      return;
+    }
+    if (ref.read(calendarIntegrationProvider).contains('naver')) {
+      setState(() => _syncNaver = true);
+      return;
+    }
+    await _showConnectDialog(
+      title: '네이버 캘린더는 아직 준비 중이에요',
+      message: '네이버 로그인 연동이 완료되면 이 토글을 켤 수 있어요.',
+      confirmLabel: null,
+    );
+  }
+
+  Future<bool?> _showConnectDialog({
+    required String title,
+    required String message,
+    required String? confirmLabel,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.protoCardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          title,
+          style: AppTypography.heading2.copyWith(color: AppColors.protoHeading),
+        ),
+        content: Text(
+          message,
+          style: AppTypography.body.copyWith(color: AppColors.protoCardText),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(confirmLabel == null ? '확인' : '취소'),
+          ),
+          if (confirmLabel != null)
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.protoButtonBg,
+                foregroundColor: AppColors.protoButtonText,
+              ),
+              child: Text(confirmLabel),
+            ),
+        ],
+      ),
+    );
+  }
+
   void _handleSave() {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
@@ -225,10 +333,14 @@ class _AddCategoryItemDialogState
             calendarSync: CalendarSyncFlags(
               google: _syncGoogle,
               naver: _syncNaver,
-              haruchip: _syncHaruchip,
+              // 하루칩 캘린더는 항상 ON — 토글 UI 자체가 없다(§3).
+              haruchip: true,
             ),
             examTimeline: examTimelineEntries,
             photoUrl: _photoUrl,
+            roomLink: _roomLink,
+            priority: _priority,
+            deadlineTime: _deadlineTime,
           ),
         );
     final messenger = ScaffoldMessenger.of(context);
@@ -479,23 +591,83 @@ class _AddCategoryItemDialogState
                         ),
                       ),
                   ],
+                  if (widget.categoryKey == 'plan') ...[
+                    const SizedBox(height: 16),
+                    _sectionLabel('우선순위'),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final option in _priorityOptions)
+                          _ChoiceChip(
+                            label: option.label,
+                            selected: _priority == option.value,
+                            onTap: () =>
+                                setState(() => _priority = option.value),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _sectionLabel('마감 시간 (선택)'),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: _pickDeadlineTime,
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.schedule_rounded,
+                              size: 18,
+                              color: AppColors.protoStepLabel,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _deadlineTime == null
+                                  ? '시간 설정 안 함'
+                                  : '${_deadlineTime!.hour.toString().padLeft(2, '0')}:${_deadlineTime!.minute.toString().padLeft(2, '0')}',
+                              style: AppTypography.cardLabel.copyWith(
+                                color: AppColors.protoHeading,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   _sectionLabel('캘린더 연동'),
                   const SizedBox(height: 4),
-                  _SyncCheckboxRow(
+                  // 하루칩 캘린더는 필수 허브 캘린더라 항상 ON이고 끌 수
+                  // 없다(§3) — 토글은 있지만 비활성 상태로만 보여준다.
+                  const _CalendarSyncToggleRow(
+                    label: '하루칩 캘린더',
+                    value: true,
+                    onChanged: null,
+                  ),
+                  _CalendarSyncToggleRow(
                     label: '구글 캘린더',
                     value: _syncGoogle,
-                    onChanged: (v) => setState(() => _syncGoogle = v),
+                    onChanged: _handleGoogleToggle,
                   ),
-                  _SyncCheckboxRow(
+                  _CalendarSyncToggleRow(
                     label: '네이버 캘린더',
                     value: _syncNaver,
-                    onChanged: (v) => setState(() => _syncNaver = v),
+                    onChanged: _handleNaverToggle,
                   ),
-                  _SyncCheckboxRow(
-                    label: '하루칩 캘린더',
-                    value: _syncHaruchip,
-                    onChanged: (v) => setState(() => _syncHaruchip = v),
+                  const SizedBox(height: 16),
+                  _sectionLabel('모임 연동 (선택)'),
+                  const SizedBox(height: 8),
+                  _RoomLinkSelector(
+                    selectedRoomId: _roomLink,
+                    onChanged: (roomId) => setState(() => _roomLink = roomId),
                   ),
                   const SizedBox(height: 20),
                   SizedBox(
@@ -574,8 +746,11 @@ class _ChoiceChip extends StatelessWidget {
   }
 }
 
-class _SyncCheckboxRow extends StatelessWidget {
-  const _SyncCheckboxRow({
+/// 캘린더별 개별 온오프 토글 — 디데이 추가 화면 명세 §3 "체크박스 하나로
+/// 뭉뚱그리지 않고, 캘린더 종류별로 각자 켜고 끌 수 있어야 한다"를 반영해
+/// 기존 체크박스(`_SyncCheckboxRow`)를 스위치로 바꿨다.
+class _CalendarSyncToggleRow extends StatelessWidget {
+  const _CalendarSyncToggleRow({
     required this.label,
     required this.value,
     required this.onChanged,
@@ -583,32 +758,73 @@ class _SyncCheckboxRow extends StatelessWidget {
 
   final String label;
   final bool value;
-  final ValueChanged<bool> onChanged;
+
+  /// null이면 항상 ON으로 고정된 토글(하루칩 캘린더 전용 — §3 "토글 자체가
+  /// 없거나 비활성").
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => onChanged(!value),
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            Checkbox(
-              value: value,
-              onChanged: (v) => onChanged(v ?? false),
-              activeColor: AppColors.protoButtonBg,
-              checkColor: AppColors.protoButtonText,
-            ),
-            Text(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
               label,
               style: AppTypography.caption.copyWith(
                 color: AppColors.protoCardText,
               ),
             ),
-          ],
-        ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: AppColors.protoButtonBg,
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// "모임 연동 셀렉터" — 생성된 방 목록(§3, `scheduleRoomsProvider`) 중
+/// 하나를 골라 이 항목에 연동한다. 방이 하나도 없으면 안내 문구만
+/// 보여준다.
+class _RoomLinkSelector extends ConsumerWidget {
+  const _RoomLinkSelector({
+    required this.selectedRoomId,
+    required this.onChanged,
+  });
+
+  final String? selectedRoomId;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rooms = ref.watch(scheduleRoomsProvider);
+    if (rooms.isEmpty) {
+      return Text(
+        '아직 생성된 모임 방이 없어요',
+        style: AppTypography.caption.copyWith(color: AppColors.protoSubtitle),
+      );
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _ChoiceChip(
+          label: '연동 안 함',
+          selected: selectedRoomId == null,
+          onTap: () => onChanged(null),
+        ),
+        for (final room in rooms)
+          _ChoiceChip(
+            label: room.name,
+            selected: selectedRoomId == room.id,
+            onTap: () => onChanged(room.id),
+          ),
+      ],
     );
   }
 }

@@ -85,6 +85,8 @@ class PlanItem {
     this.priority = PlanPriority.medium,
     this.deadlineTime,
     this.photoUrl,
+    this.roomLink,
+    this.isPredicted = false,
   }) : repeatConfig = repeatConfig ?? (repeat ? RepeatConfig.yearlyDefault : RepeatConfig.none);
 
   final String id;
@@ -128,6 +130,18 @@ class PlanItem {
   /// null.
   final String? photoUrl;
 
+  /// 연동된 일정 방(`ScheduleRoom.id`) — 핸드오프 문서 §3 "모임 연동
+  /// 셀렉터". null이면 어떤 방에도 연동되지 않은 일반 항목.
+  final String? roomLink;
+
+  /// 시스템이 자동으로 만든 예측 항목인가(§3 "예측 리스트업 로직") — 예:
+  /// 커플 카테고리의 100일/1주년 자동 예측. 이번 단계에서 자동 생성 로직
+  /// 자체는 만들지 않았지만(§5.1 자동예측 생성부는 별도 작업), 값이 있을
+  /// 때 `predictedPlanItemsProvider`가 골라내도록 필드만 먼저 둔다.
+  /// [RepeatConfig.isRepeating]인 항목은 이 값과 무관하게 이미 예측
+  /// 리스트업에 포함된다.
+  final bool isPredicted;
+
   /// 과거 `repeat: bool` 호환용 getter — 반복 종류와 무관하게 "반복되는
   /// 항목인가"만 필요한 기존 호출부가 계속 동작하도록 남겨둔다.
   bool get repeat => repeatConfig.isRepeating;
@@ -146,6 +160,8 @@ class PlanItem {
     PlanPriority? priority,
     TimeOfDay? deadlineTime,
     String? photoUrl,
+    String? roomLink,
+    bool? isPredicted,
   }) {
     return PlanItem(
       id: id ?? this.id,
@@ -161,6 +177,8 @@ class PlanItem {
       priority: priority ?? this.priority,
       deadlineTime: deadlineTime ?? this.deadlineTime,
       photoUrl: photoUrl ?? this.photoUrl,
+      roomLink: roomLink ?? this.roomLink,
+      isPredicted: isPredicted ?? this.isPredicted,
     );
   }
 }
