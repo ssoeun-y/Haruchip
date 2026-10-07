@@ -317,15 +317,20 @@ class _ExamCardWidgetState extends State<ExamCardWidget> {
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '📍 단계별 시험 일정 (원서접수 ➔ 최종합격)',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: themeColor,
+            // 좁은 폭에서는 잘라내지 않고 다음 줄로 넘긴다 (안내 문구라 전부 보여야 함).
+            Expanded(
+              child: Text(
+                '📍 단계별 시험 일정 (원서접수 ➔ 최종합격)',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: themeColor,
+                ),
               ),
             ),
+            const SizedBox(width: 8),
             Text(
               '${sortedStages.length}개 단계',
               style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
@@ -496,21 +501,30 @@ class _ExamCardWidgetState extends State<ExamCardWidget> {
                           const SizedBox(height: 6),
 
                           // 날짜 및 시간
+                          // 기간(~) + 입실시간이 붙으면 한 줄을 넘는다 — 아이콘 옆에서 자연스럽게 줄바꿈.
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.event_outlined, size: 14, color: Color(0xFF64748B)),
-                              const SizedBox(width: 4),
-                              Text(
-                                dateFormatted,
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                              const Padding(
+                                padding: EdgeInsets.only(top: 1),
+                                child: Icon(Icons.event_outlined, size: 14, color: Color(0xFF64748B)),
                               ),
-                              if (stage.testTime != null) ...[
-                                const SizedBox(width: 8),
-                                Text(
-                                  '•  ${stage.testTime}',
-                                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text.rich(
+                                  TextSpan(
+                                    text: dateFormatted,
+                                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                                    children: [
+                                      if (stage.testTime != null)
+                                        TextSpan(
+                                          text: '   •  ${stage.testTime}',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              ],
+                              ),
                             ],
                           ),
 
@@ -687,12 +701,14 @@ class _ExamCardWidgetState extends State<ExamCardWidget> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      '$dateStr ($weekday)',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
+                    Flexible(
+                      child: Text(
+                        '$dateStr ($weekday)',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
                       ),
                     ),
                   ],
@@ -736,32 +752,39 @@ class _ExamCardWidgetState extends State<ExamCardWidget> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            // 과목명
+                            // 과목명 + 시간/D-day 뱃지 — 폭이 모자라면 뱃지가 다음 줄로
+                            // 내려간다 (D-day를 말줄임으로 자르지 않기 위해).
                             Expanded(
-                              child: Text(
-                                sub.subjectName,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDone ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
-                                  decoration: isDone ? TextDecoration.lineThrough : null,
-                                ),
-                              ),
-                            ),
-                            // 시간/D-day 뱃지
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: isDone ? const Color(0xFFF1F5F9) : const Color(0xFFEFF6FF),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                timeLabel,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDone ? const Color(0xFF64748B) : themeColor,
-                                ),
+                              child: Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  Text(
+                                    sub.subjectName,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDone ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
+                                      decoration: isDone ? TextDecoration.lineThrough : null,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isDone ? const Color(0xFFF1F5F9) : const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      timeLabel,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDone ? const Color(0xFF64748B) : themeColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -779,20 +802,34 @@ class _ExamCardWidgetState extends State<ExamCardWidget> {
 
                         if (timeStr.isNotEmpty || sub.classroom != null) ...[
                           const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              if (timeStr.isNotEmpty) ...[
-                                const Icon(Icons.access_time, size: 12, color: Color(0xFF94A3B8)),
-                                const SizedBox(width: 4),
-                                Text(timeStr, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                                const SizedBox(width: 8),
+                          // 시간 + 고사장 — 한 덩어리 텍스트로 만들어 좁으면 자연스럽게 줄바꿈.
+                          Text.rich(
+                            TextSpan(
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              children: [
+                                if (timeStr.isNotEmpty) ...[
+                                  const WidgetSpan(
+                                    alignment: PlaceholderAlignment.middle,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(right: 4),
+                                      child: Icon(Icons.access_time, size: 12, color: Color(0xFF94A3B8)),
+                                    ),
+                                  ),
+                                  TextSpan(text: timeStr),
+                                  const TextSpan(text: '    '),
+                                ],
+                                if (sub.classroom != null) ...[
+                                  const WidgetSpan(
+                                    alignment: PlaceholderAlignment.middle,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(right: 4),
+                                      child: Icon(Icons.room_outlined, size: 12, color: Color(0xFF94A3B8)),
+                                    ),
+                                  ),
+                                  TextSpan(text: sub.classroom!),
+                                ],
                               ],
-                              if (sub.classroom != null) ...[
-                                const Icon(Icons.room_outlined, size: 12, color: Color(0xFF94A3B8)),
-                                const SizedBox(width: 4),
-                                Text(sub.classroom!, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                              ],
-                            ],
+                            ),
                           ),
                         ],
 

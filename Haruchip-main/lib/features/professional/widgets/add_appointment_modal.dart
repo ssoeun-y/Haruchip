@@ -505,7 +505,11 @@ class _AddAppointmentModalState extends State<_AddAppointmentModal> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
-                        child: Column(
+                        // ListTile 잉크/배경은 가장 가까운 Material에 그려지므로, 배경색 있는
+                        // 컨테이너 안에서는 투명 Material을 한 겹 둬야 보인다.
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: Column(
                           children: [
                             for (int i = 0; i < _subTasks.length; i++)
                               ListTile(
@@ -533,6 +537,7 @@ class _AddAppointmentModalState extends State<_AddAppointmentModal> {
                                 ),
                               ),
                           ],
+                          ),
                         ),
                       ),
                     ],

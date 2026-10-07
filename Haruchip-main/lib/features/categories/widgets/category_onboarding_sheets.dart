@@ -126,7 +126,7 @@ class _MilitaryOnboardingSheetState extends ConsumerState<_MilitaryOnboardingShe
         if (_nextLeaveDate != null) 'nextLeaveDate': _nextLeaveDate!.toIso8601String(),
       },
     );
-    ref.read(categoryListProvider.notifier).updateCategory(updated);
+    ref.read(categoryListProvider.notifier).upsertCategory(updated);
 
     // 3. 플랜 아이템 자동 추가/보정
     final existingItems = ref.read(planItemsByCategoryProvider(widget.category.categoryKey));
@@ -797,7 +797,7 @@ class _BabyOnboardingSheetState extends ConsumerState<_BabyOnboardingSheet> {
         'feedingIntervalHours': _feedingIntervalHours,
       },
     );
-    ref.read(categoryListProvider.notifier).updateCategory(updated);
+    ref.read(categoryListProvider.notifier).upsertCategory(updated);
 
     // D-Day & Milestone Auto Generation
     final existingItems = ref.read(planItemsByCategoryProvider(widget.category.categoryKey));
@@ -1322,7 +1322,7 @@ class _SoloOnboardingSheetState extends ConsumerState<_SoloOnboardingSheet> {
     currentMeta['soloStartDate'] = profile.activeStartDate.toIso8601String();
 
     final updated = widget.category.copyWith(metadata: currentMeta);
-    ref.read(categoryListProvider.notifier).updateCategory(updated);
+    ref.read(categoryListProvider.notifier).upsertCategory(updated);
 
     final existingItems = ref.read(planItemsByCategoryProvider(widget.category.categoryKey));
     final hasSolo = existingItems.any((i) => i.title.contains('집중') || i.title.contains('설레') || i.title.contains('솔로'));
@@ -1705,7 +1705,7 @@ class _FandomOnboardingSheetState extends ConsumerState<_FandomOnboardingSheet> 
         'topkku': topkku.toJson(),
       },
     );
-    ref.read(categoryListProvider.notifier).updateCategory(updated);
+    ref.read(categoryListProvider.notifier).upsertCategory(updated);
 
     final existingItems = ref.read(planItemsByCategoryProvider(widget.category.categoryKey));
 
@@ -2199,7 +2199,7 @@ class _CustomOnboardingSheetState extends ConsumerState<_CustomOnboardingSheet> 
         'startDate': _startDate.toIso8601String(),
       },
     );
-    ref.read(categoryListProvider.notifier).updateCategory(updated);
+    ref.read(categoryListProvider.notifier).upsertCategory(updated);
     Navigator.of(context).pop(true);
   }
 
@@ -2603,7 +2603,7 @@ class _PetOnboardingSheetState extends ConsumerState<_PetOnboardingSheet> {
         'pets': _pets.map((p) => p.toJson()).toList(),
       },
     );
-    ref.read(categoryListProvider.notifier).updateCategory(updated);
+    ref.read(categoryListProvider.notifier).upsertCategory(updated);
 
     final existingItems = ref.read(planItemsByCategoryProvider(widget.category.categoryKey));
 
@@ -3178,4 +3178,33 @@ class _PetOnboardingSheetState extends ConsumerState<_PetOnboardingSheet> {
       ),
     );
   }
+}
+
+/// 내용 입력 시트가 있는 카테고리 타입 — 이 타입들은 "카테고리 설정 → 내용
+/// 입력(저장)"까지 마쳐야 대시보드에 추가된다.
+const Set<String> kCategoryKeysWithContentSheet = {
+  'military',
+  'baby',
+  'solo',
+  'fandom',
+  'pet',
+  'custom',
+};
+
+/// [category] 타입에 맞는 내용 입력 시트를 띄운다. 저장하면 true.
+/// 시트가 없는 타입이면 null을 바로 돌려준다.
+Future<bool?> showContentSheetForCategory(
+  BuildContext context, {
+  required CategoryModel category,
+  required WidgetRef ref,
+}) {
+  return switch (category.categoryKey) {
+    'military' => showMilitaryOnboardingSheet(context, category: category, ref: ref),
+    'baby' => showBabyOnboardingSheet(context, category: category, ref: ref),
+    'solo' => showSoloOnboardingSheet(context, category: category, ref: ref),
+    'fandom' => showFandomOnboardingSheet(context, category: category, ref: ref),
+    'pet' => showPetOnboardingSheet(context, category: category, ref: ref),
+    'custom' => showCustomOnboardingSheet(context, category: category, ref: ref),
+    _ => Future.value(null),
+  };
 }

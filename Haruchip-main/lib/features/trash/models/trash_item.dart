@@ -12,7 +12,9 @@ enum TrashEntityType {
   vote('모임 투표', '🗳️', Color(0xFF0891B2)),
   event('모임 공유 일정', '🗓️', Color(0xFF2563EB)),
   room('모임 방', '👥', Color(0xFF0D9488)),
-  category('카테고리', '🏷️', Color(0xFF475569));
+  category('카테고리', '🏷️', Color(0xFF475569)),
+  exam('시험 일정', '📚', Color(0xFF4F46E5)),
+  birthday('생일 친구', '🎂', Color(0xFFEC4899));
 
   const TrashEntityType(this.labelKo, this.emoji, this.color);
 

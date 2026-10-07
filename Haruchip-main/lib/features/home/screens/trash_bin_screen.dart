@@ -3,10 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
-import '../../calendar/models/schedule_room.dart';
-import '../../calendar/providers/schedule_room_provider.dart';
-import '../../plan/models/plan_item.dart';
-import '../../plan/providers/plan_provider.dart';
+import '../../trash/logic/trash_service.dart';
 import '../../trash/models/trash_item.dart';
 import '../../trash/providers/trash_provider.dart';
 
@@ -100,42 +97,15 @@ class _TrashBinScreenState extends ConsumerState<TrashBinScreen> {
   }
 
   void _restoreItem(TrashItem item) {
-    // 1. 엔티티 타입별 원래 위치로 복원
-    final data = item.originalData;
-
-    try {
-      if (item.entityType == TrashEntityType.plan && data.isNotEmpty) {
-        final restoredPlan = PlanItem(
-          id: data['id'] as String? ?? 'plan-${DateTime.now().microsecondsSinceEpoch}',
-          title: data['title'] as String? ?? item.originalTitle,
-          date: data['date'] != null ? DateTime.parse(data['date'] as String) : DateTime.now(),
-          categoryKey: data['categoryKey'] as String? ?? item.categoryKey ?? 'plan',
-          categoryInstanceId: data['categoryInstanceId'] as String?,
-          isAllDay: data['isAllDay'] as bool? ?? false,
-          photoUrl: data['photoUrl'] as String?,
-        );
-        ref.read(planListProvider.notifier).addItem(restoredPlan);
-      } else if (item.entityType == TrashEntityType.settlement && item.roomId != null && data.isNotEmpty) {
-        final restoredSettlement = SettlementRecord.fromJson(data);
-        ref.read(scheduleRoomsProvider.notifier).restoreSettlementRecord(item.roomId!, restoredSettlement);
-      } else if (item.entityType == TrashEntityType.notice && item.roomId != null && data.isNotEmpty) {
-        final restoredNotice = RoomNotice.fromJson(data);
-        ref.read(scheduleRoomsProvider.notifier).addRoomNotice(item.roomId!, restoredNotice);
-      } else if (item.entityType == TrashEntityType.vote && item.roomId != null && data.isNotEmpty) {
-        final restoredVote = RoomVote.fromJson(data);
-        ref.read(scheduleRoomsProvider.notifier).createRoomVote(item.roomId!, restoredVote);
-      } else if (item.entityType == TrashEntityType.event && item.roomId != null && data.isNotEmpty) {
-        final restoredEvent = RoomSharedEvent.fromJson(data);
-        ref.read(scheduleRoomsProvider.notifier).addRoomEvent(item.roomId!, restoredEvent);
-      }
-    } catch (_) {}
-
-    // 2. 휴지통에서 제거
-    ref.read(trashBinProvider.notifier).restore(item.id);
+    // 원래 위치로 되돌리기에 성공했을 때만 휴지통에서 빠진다. 실패하면
+    // (원래 카테고리/방이 없어졌거나 복구 미지원 유형) 휴지통에 그대로 둔다.
+    final ok = ref.read(trashServiceProvider).restore(item);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('🎉 [${item.originalTitle}] 항목이 원래 위치로 복구되었습니다!'),
+        content: Text(ok
+            ? '🎉 [${item.originalTitle}] 항목이 원래 위치로 복구되었습니다!'
+            : '⚠️ [${item.originalTitle}] 원래 위치(카테고리/모임방)를 찾을 수 없어 복구하지 못했어요. 휴지통에 그대로 보관됩니다.'),
         behavior: SnackBarBehavior.floating,
       ),
     );

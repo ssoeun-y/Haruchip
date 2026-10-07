@@ -58,6 +58,9 @@ class EventSyncOptionsSection extends ConsumerWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
+          // 배경색 있는 컨테이너 안의 SwitchListTile 잉크가 보이도록 투명 Material 한 겹.
+          child: Material(
+          type: MaterialType.transparency,
           child: Column(
             children: [
               // 1. 하루칩 캘린더에 표시 (옵션)
@@ -192,6 +195,7 @@ class EventSyncOptionsSection extends ConsumerWidget {
                 ),
               ],
             ],
+          ),
           ),
         ),
       ],
