@@ -41,7 +41,10 @@ class _CreateRoomDialogState extends ConsumerState<_CreateRoomDialog> {
     super.dispose();
   }
 
-  void _handleCreate() {
+  bool _submitting = false;
+
+  Future<void> _handleCreate() async {
+    if (_submitting) return;
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -52,22 +55,32 @@ class _CreateRoomDialogState extends ConsumerState<_CreateRoomDialog> {
 
     final nickname = _nicknameController.text.trim().isEmpty ? '나' : _nicknameController.text.trim();
 
+    // 멤버 구분은 계정 uid로 (닉네임은 표시용 이름일 뿐)
     final host = RoomMember(
-      uid: nickname,
+      uid: ref.read(currentUserProfileProvider).uid,
       name: nickname,
       icon: _selectedEmoji,
       colorHex: _selectedColor,
       isHost: true,
     );
 
-    final newRoom = ref.read(scheduleRoomsProvider.notifier).createRoom(
-          name: name,
-          description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
-          categoryTag: _selectedCategory,
-          hostMember: host,
-        );
-
-    Navigator.of(context).pop(newRoom);
+    setState(() => _submitting = true);
+    try {
+      final newRoom = await ref.read(scheduleRoomsProvider.notifier).createRoomSynced(
+            name: name,
+            description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
+            categoryTag: _selectedCategory,
+            hostMember: host,
+          );
+      if (!mounted) return;
+      Navigator.of(context).pop(newRoom);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ 방을 만들지 못했어요. 로그인·네트워크·보안 규칙을 확인해주세요. ($e)')),
+      );
+    }
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/gestures.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'design_system/colors.dart';
+import 'features/calendar/data/room_remote.dart';
 import 'features/onboarding/screens/category_selection_screen.dart';
 import 'features/onboarding/screens/splash_screen.dart';
 import 'firebase_options.dart';
@@ -43,7 +45,13 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   runApp(
     ProviderScope(
-      overrides: [localStoreProvider.overrideWithValue(SharedPrefsLocalStore(prefs))],
+      overrides: [
+        localStoreProvider.overrideWithValue(SharedPrefsLocalStore(prefs)),
+        // 모임방 Firestore 실시간 동기화 (로그인 시)
+        roomRemoteProvider.overrideWithValue(
+          FirestoreRoomRemote(FirebaseFirestore.instance, authChanges: firebaseRoomUserChanges()),
+        ),
+      ],
       child: const HaruChipApp(),
     ),
   );

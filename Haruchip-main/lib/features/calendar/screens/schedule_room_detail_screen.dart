@@ -10,6 +10,7 @@ import '../../trash/models/trash_item.dart';
 import '../../trash/providers/trash_provider.dart';
 import '../data/calendar_mock_data.dart';
 import '../models/schedule_room.dart';
+import '../data/room_remote.dart';
 import '../providers/schedule_room_provider.dart';
 import '../widgets/add_room_event_dialog.dart';
 import '../widgets/add_room_notice_dialog.dart';
@@ -216,6 +217,12 @@ class _ScheduleRoomDetailScreenState
 
   @override
   Widget build(BuildContext context) {
+    // 모임방 서버 동기화 실패(권한·네트워크)를 사용자에게 알린다.
+    ref.listen<String?>(roomSyncErrorProvider, (_, msg) {
+      if (msg == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      ref.read(roomSyncErrorProvider.notifier).state = null;
+    });
     final rooms = ref.watch(scheduleRoomsProvider);
     final room = rooms.firstWhere(
       (r) => r.id == widget.roomId,

@@ -1,7 +1,9 @@
 import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/calendar_mock_data.dart';
+import '../data/room_remote.dart';
 import '../models/schedule_room.dart';
 
 /// 내 고유 사용자 ID 코드 (로그인 시 자동 발급되는 영문+숫자 프로필 코드)
@@ -22,7 +24,13 @@ class CurrentUserProfile {
   final String colorHex;
 }
 
+/// 로그인돼 있으면 Firebase 계정 uid/이름 — 모임방 멤버 구분은 반드시 계정 uid로
+/// 한다(닉네임을 uid로 쓰면 같은 닉네임끼리 섞인다). 로그인 전·테스트는 목업.
 final currentUserProfileProvider = Provider<CurrentUserProfile>((ref) {
+  final user = ref.watch(roomAuthUserProvider).valueOrNull;
+  if (user != null) {
+    return CurrentUserProfile(uid: user.uid, name: user.displayName, icon: '🐥', colorHex: '#DFE7FD');
+  }
   return const CurrentUserProfile(
     uid: '하루',
     name: '하루',
@@ -33,8 +41,87 @@ final currentUserProfileProvider = Provider<CurrentUserProfile>((ref) {
 
 /// 모임(Room) 그룹 목록 및 실시간 상태 관리 Notifier
 class ScheduleRoomListNotifier extends Notifier<List<ScheduleRoom>> {
+  /// Firestore 동기화가 켜져 있고(앱) 로그인돼 있으면 내 방들을 실시간 구독한다.
+  /// 그 외(테스트·로그인 전)에는 기존처럼 목업 데이터로 기기 안에서만 동작한다.
   @override
-  List<ScheduleRoom> build() => mockScheduleRooms;
+  List<ScheduleRoom> build() {
+    final remote = ref.watch(roomRemoteProvider);
+    if (remote == null) return mockScheduleRooms;
+    final user = ref.watch(roomAuthUserProvider).valueOrNull;
+    if (user == null) return const [];
+
+    final sub = remote.watchMyRooms(user.uid).listen(
+      (remoteRooms) => state = [for (final r in remoteRooms) _keepLocalOnly(r)],
+      onError: (Object e) => _reportError(e),
+    );
+    ref.onDispose(sub.cancel);
+    return const [];
+  }
+
+  /// 공지·투표·정산은 아직 서버에 없다 — 같은 방의 기기 로컬 값을 유지한다.
+  ScheduleRoom _keepLocalOnly(ScheduleRoom remoteRoom) {
+    final local = state.where((r) => r.id == remoteRoom.id);
+    if (local.isEmpty) return remoteRoom;
+    final l = local.first;
+    return remoteRoom.copyWith(
+      notices: l.notices,
+      votes: l.votes,
+      rounds: l.rounds,
+      settlementHistory: l.settlementHistory,
+      payments: l.payments,
+      settlementConfirmedAt: l.settlementConfirmedAt,
+    );
+  }
+
+  /// 원격 동기화 대상이면 (remote, 로그인 사용자) — 아니면 null.
+  ({FirestoreRoomRemote remote, RoomUser user})? get _sync {
+    final remote = ref.read(roomRemoteProvider);
+    final user = remote == null ? null : ref.read(roomAuthUserProvider).valueOrNull;
+    return (remote == null || user == null) ? null : (remote: remote, user: user);
+  }
+
+  void _reportError(Object e) {
+    final msg = e is FirebaseException && e.code == 'permission-denied'
+        ? '권한이 없어 저장하지 못했어요 (보안 규칙을 확인해주세요)'
+        : '서버와 동기화하지 못했어요: $e';
+    ref.read(roomSyncErrorProvider.notifier).state = msg;
+  }
+
+  /// 원격 쓰기 — 화면은 즉시(낙관적) 반영하고, 실패하면 오류를 알린다.
+  void _push(Future<void> Function() write) {
+    write().catchError((Object e) => _reportError(e));
+  }
+
+  /// 방 만들기 (화면용). 원격이면 Firestore에 만들고, 아니면 기존 [createRoom].
+  Future<ScheduleRoom> createRoomSynced({
+    required String name,
+    String? description,
+    String categoryTag = '모임',
+    required RoomMember hostMember,
+  }) async {
+    final s = _sync;
+    if (s == null) {
+      return createRoom(name: name, description: description, categoryTag: categoryTag, hostMember: hostMember);
+    }
+    final room = await s.remote.createRoom(
+      user: s.user,
+      name: name,
+      description: description,
+      categoryTag: categoryTag,
+      host: hostMember,
+    );
+    if (!state.any((r) => r.id == room.id)) state = [room, ...state];
+    return room;
+  }
+
+  /// 초대코드로 참가 (화면용).
+  Future<JoinRoomResult> joinRoomSynced(String inviteCode, RoomMember member) async {
+    final s = _sync;
+    if (s == null) {
+      return joinRoomWithCode(inviteCode, member) ? JoinRoomResult.joined : JoinRoomResult.notFound;
+    }
+    return s.remote.joinWithCode(user: s.user, rawCode: inviteCode, me: member);
+  }
 
   /// 8~10자리 보안 랜덤 초대코드 생성
   String _generateSecurityCode() {
@@ -134,6 +221,11 @@ class ScheduleRoomListNotifier extends Notifier<List<ScheduleRoom>> {
         else
           room,
     ];
+    final s = _sync;
+    // 규칙상 본인 멤버 정보만 바꿀 수 있다.
+    if (s != null && s.user.uid == uid) {
+      _push(() => s.remote.updateMyMember(roomId: roomId, uid: uid, name: name, icon: icon, colorHex: colorHex));
+    }
   }
 
   /// 4. 모임 공유 캘린더 일정 추가 / 삭제
@@ -147,6 +239,8 @@ class ScheduleRoomListNotifier extends Notifier<List<ScheduleRoom>> {
         else
           room,
     ];
+    final s = _sync;
+    if (s != null) _push(() => s.remote.addEvent(roomId: roomId, event: event));
   }
 
   void removeRoomEvent(String roomId, String eventId) {
@@ -159,6 +253,8 @@ class ScheduleRoomListNotifier extends Notifier<List<ScheduleRoom>> {
         else
           room,
     ];
+    final s = _sync;
+    if (s != null) _push(() => s.remote.removeEvent(roomId: roomId, eventId: eventId));
   }
 
   /// 5. 공지사항 추가 / 핀 고정 / 수정 / 확인 체크 / 댓글 / 삭제
@@ -482,6 +578,8 @@ class ScheduleRoomListNotifier extends Notifier<List<ScheduleRoom>> {
       for (final room in state)
         if (room.id == roomId) _withMyDates(room, myUid, myDates) else room,
     ];
+    final s = _sync;
+    if (s != null) _push(() => s.remote.setMyAvailability(roomId: roomId, uid: myUid, dates: myDates));
   }
 
   ScheduleRoom _withMyDates(ScheduleRoom room, String myUid, Set<String> myDates) {
@@ -502,6 +600,8 @@ class ScheduleRoomListNotifier extends Notifier<List<ScheduleRoom>> {
       for (final room in state)
         if (room.id == roomId) room.copyWith(confirmedDate: date) else room,
     ];
+    final s = _sync;
+    if (s != null) _push(() => s.remote.confirmDate(roomId: roomId, date: date));
   }
 
   /// 9-1. 확정된 모임 일정에 댓글 달기
@@ -513,6 +613,8 @@ class ScheduleRoomListNotifier extends Notifier<List<ScheduleRoom>> {
         else
           room,
     ];
+    final s = _sync;
+    if (s != null) _push(() => s.remote.addMeetingComment(roomId: roomId, comment: comment));
   }
 
   /// 기존 payments 갱신 및 확정

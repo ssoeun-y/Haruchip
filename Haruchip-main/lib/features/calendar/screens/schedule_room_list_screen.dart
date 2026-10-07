@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/typography.dart';
+import '../data/room_remote.dart';
 import '../providers/schedule_room_provider.dart';
 import '../widgets/create_room_dialog.dart';
 import '../widgets/join_room_dialog.dart';
@@ -17,6 +18,12 @@ class ScheduleRoomListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 모임방 서버 동기화 실패(권한·네트워크)를 사용자에게 알린다.
+    ref.listen<String?>(roomSyncErrorProvider, (_, msg) {
+      if (msg == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      ref.read(roomSyncErrorProvider.notifier).state = null;
+    });
     final rooms = ref.watch(scheduleRoomsProvider);
     final myCode = ref.watch(myUserCodeProvider);
 

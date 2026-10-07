@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
 import '../models/schedule_room.dart';
+import '../data/room_remote.dart';
 import '../providers/schedule_room_provider.dart';
 
 /// 초대 코드로 모임 방 참가 다이얼로그
@@ -36,7 +37,10 @@ class _JoinRoomDialogState extends ConsumerState<_JoinRoomDialog> {
     super.dispose();
   }
 
-  void _handleJoin() {
+  bool _submitting = false;
+
+  Future<void> _handleJoin() async {
+    if (_submitting) return;
     final code = _codeController.text.trim();
     if (code.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,25 +51,35 @@ class _JoinRoomDialogState extends ConsumerState<_JoinRoomDialog> {
 
     final nickname = _nicknameController.text.trim().isEmpty ? '나' : _nicknameController.text.trim();
 
+    // 멤버 구분은 계정 uid로 (닉네임은 표시용 이름일 뿐)
     final member = RoomMember(
-      uid: nickname,
+      uid: ref.read(currentUserProfileProvider).uid,
       name: nickname,
       icon: _selectedEmoji,
       colorHex: _selectedColor,
     );
 
-    final success = ref.read(scheduleRoomsProvider.notifier).joinRoomWithCode(code, member);
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('❌ 일치하는 모임 방 코드를 찾을 수 없습니다.')),
-      );
-      return;
+    setState(() => _submitting = true);
+    JoinRoomResult result;
+    try {
+      result = await ref.read(scheduleRoomsProvider.notifier).joinRoomSynced(code, member);
+    } catch (_) {
+      result = JoinRoomResult.failed;
     }
+    if (!mounted) return;
+    setState(() => _submitting = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🎉 모임 방에 성공적으로 참여했습니다!')),
-    );
-    Navigator.of(context).pop(true);
+    final message = switch (result) {
+      JoinRoomResult.joined => '🎉 모임 방에 성공적으로 참여했습니다!',
+      JoinRoomResult.alreadyMember => '이미 참여 중인 모임 방이에요.',
+      JoinRoomResult.notFound => '❌ 일치하는 모임 방 코드를 찾을 수 없습니다.',
+      JoinRoomResult.expired => '⌛ 만료된 초대 코드예요 (7일). 방장에게 새 코드를 받아주세요.',
+      JoinRoomResult.failed => '❌ 참여하지 못했어요. 로그인·네트워크를 확인해주세요.',
+    };
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    if (result == JoinRoomResult.joined || result == JoinRoomResult.alreadyMember) {
+      Navigator.of(context).pop(true);
+    }
   }
 
   @override

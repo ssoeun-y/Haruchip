@@ -143,6 +143,10 @@ scheduleRooms/{roomId}
   - availability/{uid}: { "YYYY-MM-DD": [{start:"HH:mm", end:"HH:mm"}, ...] }  ← 각자 자기 문서만 쓰기
   - settlements/{id}: 차수/결제자/참석자/예외, transfers: {uid: 보냄·받음 상태}
 
+> 구현 상태(2026-10): 방·멤버·초대코드·가능 날짜·확정·확정 댓글·공유 캘린더 일정은 Firestore 실시간 동기화
+> (`lib/features/calendar/data/room_remote.dart`, 규칙 `firestore.rules`). 공지·투표·정산은 아직 기기 로컬.
+> 로그인 전/테스트에서는 `roomRemoteProvider`가 null → 기존 목업으로 동작.
+
 inviteCodes/{code}
   - roomId, createdBy, expiresAt — **여러 명이 같은 코드로 참가 가능(다회용) + 만료 7일**(방장이 재발급 가능)
     가능 시간은 1시간 단위 범위(예: 19:00~22:00)로 입력한다
