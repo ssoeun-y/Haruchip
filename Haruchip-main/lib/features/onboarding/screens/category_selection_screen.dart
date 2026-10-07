@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
+import '../../categories/logic/category_content_flow.dart';
+import '../../categories/models/category.dart';
 import '../../categories/providers/category_provider.dart';
 import '../data/onboarding_categories.dart';
 import '../providers/category_selection_provider.dart';
@@ -43,13 +45,36 @@ class CategorySelectionScreen extends ConsumerWidget {
       ref.read(categorySelectionProvider.notifier).toggle(key);
     }
 
-    void handleNext() {
+    Future<void> handleNext() async {
       if (!canProceed) return;
 
-      final types = kOnboardingCategories
-          .where((c) => selectedKeys.contains(c.key))
-          .map((c) => (key: c.key, labelKo: c.labelKo, emoji: c.emoji));
-      ref.read(categoryListProvider.notifier).seedFromKeys(types);
+      // 고른 카테고리마다 내용(커플: 만난 날, 일정: 첫 일정, 반려동물: 아이 정보 …)을
+      // 입력·저장해야 추가된다. 빈 카테고리로 시작하지 않는다.
+      final notifier = ref.read(categoryListProvider.notifier);
+      final types = kOnboardingCategories.where((c) => selectedKeys.contains(c.key));
+      for (final type in types) {
+        final alreadyHas = ref.read(categoryListProvider).any((c) => c.categoryKey == type.key);
+        if (alreadyHas) continue;
+        while (true) {
+          final draft = notifier.newDraft(
+            categoryKey: type.key,
+            name: type.labelKo,
+            emoji: type.emoji,
+            colorHex: colorToHex(AppColors.kFreeColorPresets.first),
+          );
+          final added = await collectContentAndAddCategory(context, ref, draft);
+          if (added || !context.mounted) break;
+          final retry = await _askRetryOrSkip(context, type.labelKo);
+          if (!context.mounted) return;
+          if (!retry) {
+            ref.read(categorySelectionProvider.notifier).toggle(type.key);
+            break;
+          }
+        }
+        if (!context.mounted) return;
+      }
+      // 전부 뺐으면 이 화면에 머문다 (최소 1개 선택 안내가 다시 보인다).
+      if (ref.read(categoryListProvider).isEmpty) return;
 
       if (onNext != null) {
         onNext!();
@@ -126,6 +151,35 @@ class CategorySelectionScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// 내용 입력창을 저장 없이 닫았을 때: 다시 입력(true) / 이 카테고리 빼기(false).
+Future<bool> _askRetryOrSkip(BuildContext context, String label) async {
+  final retry = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text("'$label' 내용을 입력해주세요"),
+      content: const Text('내용을 입력하고 저장해야 이 카테고리로 시작할 수 있어요.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('이 카테고리 빼기'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.protoButtonBg,
+            foregroundColor: AppColors.protoButtonText,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+          child: const Text('다시 입력하기'),
+        ),
+      ],
+    ),
+  );
+  return retry ?? true;
 }
 
 class _BottomCta extends StatelessWidget {

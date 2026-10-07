@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../services/storage/local_store.dart';
 import '../data/couple_mock_data.dart';
 import '../models/couple_relationship.dart';
 
@@ -11,8 +14,21 @@ DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 /// [addBreakup]/[addReunite]는 이 규칙을 지키지 못하면 상태를 바꾸지 않고
 /// false를 반환한다 — UI 쪽에서 이 반환값으로 에러 토스트 등을 띄우면 된다.
 class CoupleNotifier extends Notifier<CoupleRelationship> {
+  /// 저장된 관계가 있으면 복원(첫 실행이면 기존 목업), 바뀔 때마다 저장.
   @override
-  CoupleRelationship build() => mockCoupleRelationship;
+  CoupleRelationship build() {
+    final store = ref.watch(localStoreProvider);
+    listenSelf((_, next) {
+      store.writeString(LocalStoreKeys.couple, jsonEncode(next.toJson()));
+    });
+    final raw = store.readString(LocalStoreKeys.couple);
+    if (raw == null) return mockCoupleRelationship;
+    try {
+      return CoupleRelationship.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
+    } catch (_) {
+      return mockCoupleRelationship;
+    }
+  }
 
   /// 이별 기록 추가.
   ///

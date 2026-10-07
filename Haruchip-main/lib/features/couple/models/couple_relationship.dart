@@ -39,6 +39,16 @@ class ReunionPeriod {
       reuniteDate: reuniteDate ?? this.reuniteDate,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'breakupDate': breakupDate.toIso8601String(),
+        'reuniteDate': reuniteDate?.toIso8601String(),
+      };
+
+  factory ReunionPeriod.fromJson(Map<String, dynamic> json) => ReunionPeriod(
+        breakupDate: DateTime.parse(json['breakupDate'] as String),
+        reuniteDate: json['reuniteDate'] == null ? null : DateTime.parse(json['reuniteDate'] as String),
+      );
 }
 
 /// 커플 관계 전체 상태. CLAUDE.md §4 `coupleRooms`의 클라이언트 측 표현.
@@ -70,6 +80,23 @@ class CoupleRelationship {
       reunions: reunions ?? this.reunions,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'startDate': startDate.toIso8601String(),
+        'partnerName': partnerName,
+        'partnerIcon': partnerIcon,
+        'reunions': reunions.map((r) => r.toJson()).toList(),
+      };
+
+  factory CoupleRelationship.fromJson(Map<String, dynamic> json) => CoupleRelationship(
+        startDate: DateTime.parse(json['startDate'] as String),
+        partnerName: json['partnerName'] as String? ?? '',
+        partnerIcon: json['partnerIcon'] as String? ?? '💕',
+        reunions: (json['reunions'] as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map((e) => ReunionPeriod.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
+      );
 }
 
 /// CLAUDE.md §7-2 기념일 한 건 — `upcomingAnniversariesProvider`가 반환하는 타입.

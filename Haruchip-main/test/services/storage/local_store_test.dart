@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:haruchip/features/categories/logic/repeat_rule.dart';
 import 'package:haruchip/features/categories/models/exam_timeline.dart';
 import 'package:haruchip/features/categories/providers/category_provider.dart';
+import 'package:haruchip/features/couple/models/couple_relationship.dart';
+import 'package:haruchip/features/couple/providers/couple_provider.dart';
 import 'package:haruchip/features/plan/data/plan_mock_data.dart';
 import 'package:haruchip/features/plan/models/plan_item.dart';
 import 'package:haruchip/features/plan/providers/plan_provider.dart';
@@ -116,6 +118,18 @@ void main() {
 
       final ids = _boot(store).read(trashBinProvider).map((t) => t.id);
       expect(ids, ['t-fresh']);
+    });
+
+    test('커플 만난 날/재회 기록이 재시작 후에도 남는다', () {
+      final store = InMemoryLocalStore();
+      _boot(store).read(coupleProvider.notifier).updateRelationship(
+            startDate: DateTime(2025, 3, 14),
+            reunions: [ReunionPeriod(breakupDate: DateTime(2025, 8, 1), reuniteDate: DateTime(2025, 8, 20))],
+          );
+
+      final after = _boot(store).read(coupleProvider);
+      expect(after.startDate, DateTime(2025, 3, 14));
+      expect(after.reunions.single.reuniteDate, DateTime(2025, 8, 20));
     });
 
     test('저장 데이터가 깨져 있으면 앱이 죽지 않고 기본값으로 시작한다', () {

@@ -66,6 +66,7 @@ abstract final class LocalStoreKeys {
   static const categories = 'haruchip.categories.v1';
   static const plans = 'haruchip.plans.v1';
   static const trash = 'haruchip.trash.v1';
+  static const couple = 'haruchip.couple.v1';
 }
 
 /// [key]에 저장된 JSON 배열을 [fromJson]으로 복원한다. 저장된 값이 없으면

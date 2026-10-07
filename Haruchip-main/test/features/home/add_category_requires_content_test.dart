@@ -131,13 +131,17 @@ void main() {
     expect(find.text('내용을 입력하고 저장해야 카테고리가 추가돼요.'), findsOneWidget);
   });
 
-  testWidgets('커플은 기존처럼 바로 추가된다 (관계 설정은 카드 진입 시)', (tester) async {
+  testWidgets('커플: 만난 날 설정을 완료해야 추가된다', (tester) async {
     final c = await _openModal(tester);
 
     await tester.tap(find.text('커플'));
     await tester.pumpAndSettle();
-    expect(find.text('추가하기'), findsOneWidget);
-    await tester.tap(find.text('추가하기'));
+    await tester.tap(find.text('다음: 내용 입력하기'));
+    await tester.pumpAndSettle();
+    expect(find.text('만난 날 및 재회 설정'), findsOneWidget);
+    expect(c.read(categoryListProvider), isEmpty);
+
+    await tester.tap(find.text('설정 완료'));
     await tester.pumpAndSettle();
 
     expect(c.read(categoryListProvider).single.categoryKey, 'couple');

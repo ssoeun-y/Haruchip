@@ -4,13 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
 import '../../categories/data/category_types.dart';
-import '../../categories/logic/category_entry_mirrors.dart';
+import '../../categories/logic/category_content_flow.dart';
 import '../../categories/models/category.dart';
 import '../../categories/providers/category_provider.dart';
 import '../../categories/services/image_upload_service.dart';
-import '../../categories/widgets/category_onboarding_sheets.dart';
 import '../../onboarding/models/onboarding_category.dart';
-import '../../plan/providers/plan_provider.dart';
 
 /// "카테고리 추가하기" 모달 — CLAUDE.md §5("+ 새 카테고리 추가하기" 진입점),
 /// §8(대시보드 명세).
@@ -122,6 +120,8 @@ class _AddCategoryDashboardModalState
     }
   }
 
+  /// 카테고리 설정(이름/이모지/색) → 그 카테고리의 내용 입력 → 저장하면 추가.
+  /// 입력창을 그냥 닫으면 아무것도 추가되지 않고 이 화면(설정)으로 돌아온다.
   Future<void> _handleAdd(BuildContext context) async {
     final type = _selectedType;
     if (type == null) return;
@@ -130,80 +130,22 @@ class _AddCategoryDashboardModalState
         : _nameController.text.trim();
     final emoji = _selectedEmoji ?? type.emoji;
 
-    // 내용 입력 시트가 있는 타입은 시트에서 "저장"까지 해야 추가된다.
-    // 시트를 그냥 닫으면 아무것도 추가되지 않고 이 화면(설정)으로 돌아온다.
-    if (kCategoryKeysWithContentSheet.contains(type.key)) {
-      final draft = ref.read(categoryListProvider.notifier).newDraft(
-            categoryKey: type.key,
-            name: name,
-            emoji: emoji,
-            colorHex: colorToHex(_selectedColor),
-            backgroundImageUrl: _backgroundImageUrl,
-          );
-      final saved = await showContentSheetForCategory(context, category: draft, ref: ref);
-      if (!context.mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      if (saved == true) {
-        Navigator.of(context).pop();
-        messenger.showSnackBar(
-          SnackBar(content: Text("✨ '$name' 카테고리가 추가되었습니다!")),
-        );
-      } else {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('내용을 입력하고 저장해야 카테고리가 추가돼요.')),
-        );
-      }
-      return;
-    }
-
-    // 일정/목표/루틴/시험/생일은 카테고리 안에서 쓰는 항목 입력창을 그대로
-    // 띄워 첫 항목까지 받아야 추가된다. 빈 제목은 입력창이 "입력해주세요"로
-    // 막고, 입력창을 그냥 닫으면 아무것도 추가되지 않는다.
-    if (kCategoryKeysWithFirstEntryForm.contains(type.key)) {
-      final notifier = ref.read(categoryListProvider.notifier);
-      final draft = notifier.newDraft(
-        categoryKey: type.key,
-        name: name,
-        emoji: emoji,
-        colorHex: colorToHex(_selectedColor),
-        backgroundImageUrl: _backgroundImageUrl,
-      );
-      final entry = await showFirstEntryFormForCategory(
-        context,
-        categoryKey: type.key,
-        categoryId: draft.id,
-      );
-      if (!context.mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      if (entry == null) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('내용을 입력하고 저장해야 카테고리가 추가돼요.')),
-        );
-        return;
-      }
-      notifier.upsertCategory(draft.copyWith(metadata: {
-        'isInitialized': true,
-        entry.metaKey: [entry.json],
-      }));
-      if (entry.mirrors.isNotEmpty) {
-        ref.read(planListProvider.notifier).addItems(entry.mirrors);
-      }
-      Navigator.of(context).pop();
-      messenger.showSnackBar(
-        SnackBar(content: Text("✨ '$name' 카테고리가 추가되었습니다!")),
-      );
-      return;
-    }
-
-    ref.read(categoryListProvider.notifier).addCategory(
+    final draft = ref.read(categoryListProvider.notifier).newDraft(
           categoryKey: type.key,
           name: name,
           emoji: emoji,
           colorHex: colorToHex(_selectedColor),
           backgroundImageUrl: _backgroundImageUrl,
         );
-
+    final added = await collectContentAndAddCategory(context, ref, draft);
+    if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    if (!added) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('내용을 입력하고 저장해야 카테고리가 추가돼요.')),
+      );
+      return;
+    }
     Navigator.of(context).pop();
     messenger.showSnackBar(
       SnackBar(content: Text("✨ '$name' 카테고리가 추가되었습니다!")),
@@ -286,8 +228,7 @@ class _AddCategoryDashboardModalState
                           ),
                         ),
                         child: Text(
-                          kCategoryKeysWithContentSheet.contains(type.key) ||
-                                  kCategoryKeysWithFirstEntryForm.contains(type.key)
+                          categoryNeedsContent(type.key)
                               ? '다음: 내용 입력하기'
                               : '추가하기',
                         ),
