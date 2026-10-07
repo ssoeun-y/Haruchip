@@ -39,8 +39,9 @@ Claude Code / Antigravity(리더 세션)는 작업 전 이 문서를 항상 먼�
 
 | 담당자 | 무엇을 맡나 | 손의 크기(읽기/쓰기) | 담당 폴더 |
 |---|---|---|---|
-| 소은 (도메인 담당) | 카테고리 화면, 재회/기념일 로직, 꾸미기 시스템, AI 스케줄링, 캘린더 UI, 방 조율/정산 로직, **로그인 전체(카카오/애플/구글)** | 읽기 + 쓰기 | `lib/features/*`, `lib/design_system/`, `functions/src/aiScheduling`, `functions/src/settlement`, `lib/services/auth/` |
-| 보안 담당 | 인앱결제/구독, Firestore 보안 규칙, 카카오페이/토스 딥링크 구현, 시크릿 관리 | 읽기 + 쓰기 | `lib/services/payment`, `firestore.rules`, `functions/.env` 관리 |
+| 소은 (도메인 + 보안 담당) | 카테고리 화면, 재회/기념일 로직, 꾸미기 시스템, AI 스케줄링, 캘린더 UI, 방 조율/정산 로직, **로그인 전체(카카오/애플/구글)**, **인앱결제/구독, Firestore 보안 규칙, 카카오페이/토스 송금 연결, 시크릿 관리** | 읽기 + 쓰기 | `lib/features/*`, `lib/design_system/`, `functions/src/*`, `lib/services/*`(auth/payment 포함), `firestore.rules`, `firestore.indexes.json`, `functions/.env` 관리 |
+
+> (2026-10 갱신) 기존 "보안 담당" 역할은 소은에게 통합됐다. 보안 규칙·송금 코드도 같은 사람이 맡지만, §9 OWASP 체크리스트 자체 리뷰와 "판단 기준 세 줄"은 그대로 적용한다.
 
 - **쓰기는 각자 담당 폴더 안에서만.** 서브에이전트를 만들 때도 `tools`로 손 크기를 이 표대로 제한한다 (읽기 전용 담당자에게 파일 쓰기 도구를 주지 않는다)
 - 겹치는 파일(`pubspec.yaml`, 라우팅, `design_system/`, `firestore.rules`)을 고칠 땐 반드시 상대에게 알리고 진행
@@ -133,10 +134,20 @@ coupleRooms/{roomId}
   - startDate, reunions: [{breakupDate, reuniteDate}]
   - themeColor, photos: [{url, date, caption}]
 
+> Firestore `(default)` DB 위치: **미국 리전**(2026-10 생성, 변경 불가). 계좌번호 등 개인정보가 국외에 저장되므로
+> 개인정보처리방침에 국외 저장 사실을 고지해야 하는지 출시 전 확인할 것.
+
 scheduleRooms/{roomId}
-  - name, inviteCode(1회용), members: [{uid, name, icon}]
-  - dates: { "YYYY-MM-DD": [uid, ...] }
-  - settlement: { payments: {uid: amount}, confirmedAt: timestamp|null }
+  - name, hostUid, memberUids[], confirmedDate, createdAt
+  - members/{uid}: name, icon, colorHex, payout(받는 송금 정보 — 계좌/토스아이디/카카오페이 송금코드, 방 멤버만 읽기)
+  - availability/{uid}: { "YYYY-MM-DD": [{start:"HH:mm", end:"HH:mm"}, ...] }  ← 각자 자기 문서만 쓰기
+  - settlements/{id}: 차수/결제자/참석자/예외, transfers: {uid: 보냄·받음 상태}
+
+inviteCodes/{code}
+  - roomId, createdBy, expiresAt — **여러 명이 같은 코드로 참가 가능(다회용) + 만료 7일**(방장이 재발급 가능)
+    가능 시간은 1시간 단위 범위(예: 19:00~22:00)로 입력한다
+    (2026-10 결정: 기존 "1회용"에서 변경. 참가 검증은 Firestore 보안 규칙으로 — 본인 uid만 추가 가능 +
+     유효(이 방·미만료) 코드 제출 필수, 코드 목록 조회 금지. Spark(무료) 요금제 유지, Cloud Functions 미사용)
 ```
 
 ---
@@ -190,9 +201,11 @@ scheduleRooms/{roomId}
 ### 7-5. 일정 방 — 방 상세 플로우
 ```
 방 클릭 → 방 상세
-  1. 날짜 그리드 노출 → 탭으로 본인 가능여부 토글 (room.dates[date])
+  1. 날짜 그리드 노출 → 날짜를 탭해 본인 가능 "날짜 + 시간대" 입력
+     (달력 칸은 날짜 단위로만 색 진하기 = 그날 되는 인원 비율. 시간은 칸에 안 그림)
   2. 다른 멤버 표시도 같은 화면에서 확인
   3. 전원 겹침 강조, 최다인원 자동 계산
+     → 화면 맨 아래 "겹치는 날짜" 목록: 날짜 + 겹치는 시간대 + 가능 인원
   4. 안 겹치면 → 과반수 추천 → 불참 예외처리 → 5개 후보 투표(24시간, 조기종료 가능)
   5. 확정 → 방에서 제거, 개인 캘린더로 전환 등록 → 구글 등록 팝업 → 색상 선택
 ```
@@ -220,6 +233,8 @@ function calculateSettlement(payments, members) {
 ```
 - 부채 최소화 그리디 알고리즘, Dart 포팅 시 로직 그대로 이식
 - 송금: 카카오페이/토스 딥링크(URL 스킴), 제휴 불필요, 금액 미리 채움
+  - (2026-10) 카카오페이는 외부 개발자용 개인 송금 API가 공개돼 있지 않아 "앱 연동"은 불가 — 받는 사람이
+    등록한 계좌번호(복사) / 토스아이디 링크 / 카카오페이 송금코드 링크를 연다. 하루칩은 돈을 직접 다루지 않는다.
 - **확정 시점 = 실제 송금 진행 시점**, 확정 후에도 재계산 항상 허용
 
 ---
