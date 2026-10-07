@@ -39,6 +39,10 @@ class _ScheduleRoomDetailScreenState
   final Map<String, TextEditingController> _commentControllers = {};
   final Set<String> _expandedSettlementAccordions = {};
 
+  /// 일정 조율 탭에서 저장 전 임시로 고른 내 가능 날짜 (null = 저장된 값 그대로)
+  Set<String>? _draftMyDates;
+  final _meetingCommentController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +64,7 @@ class _ScheduleRoomDetailScreenState
     for (final c in _commentControllers.values) {
       c.dispose();
     }
+    _meetingCommentController.dispose();
     super.dispose();
   }
 
@@ -93,7 +98,35 @@ class _ScheduleRoomDetailScreenState
     return '${date.month}/${date.day}($weekday)';
   }
 
+  /// 방장 전용: [dateStr]로 모임 확정. 확인 창을 거치고, 다른 날로 다시 확정하면
+  /// 기존 확정 일정(개인 캘린더·공유 캘린더)을 새 날짜로 옮긴다(중복 생성 X).
   Future<void> _handleConfirmDate(BuildContext context, ScheduleRoom room, String dateStr) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('${_shortDateLabel(dateStr)}로 모임을 확정할까요?'),
+        content: Text(
+          room.confirmedDate == null
+              ? '확정하면 공유 캘린더와 내 캘린더에 모임 일정이 추가돼요.'
+              : '기존 확정일(${_shortDateLabel(room.confirmedDate!)})이 이 날짜로 바뀌어요.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('취소')),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F172A),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('확정하기'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+
     ref.read(scheduleRoomsProvider.notifier).confirmDate(widget.roomId, dateStr);
 
     final parts = dateStr.split('-');
@@ -104,26 +137,37 @@ class _ScheduleRoomDetailScreenState
         int.parse(parts[2]),
       );
 
-      // Create a shared plan item in main personal calendar as well
-      final planItem = PlanItem(
-        id: 'plan-room-${DateTime.now().microsecondsSinceEpoch}',
-        categoryKey: 'plan',
-        title: '[${room.name}] 확정 모임',
-        date: date,
-        roomLinks: [room.id],
-      );
-      ref.read(planListProvider.notifier).addItem(planItem);
+      // 내 개인 캘린더 사본 — 방마다 고정 id라 재확정 시 날짜만 바뀐다.
+      final planId = 'plan-room-${room.id}-meeting';
+      final plans = ref.read(planListProvider.notifier);
+      final existing = ref.read(planListProvider).where((p) => p.id == planId);
+      if (existing.isNotEmpty) {
+        plans.updateItem(existing.first.copyWith(date: date));
+      } else {
+        plans.addItem(PlanItem(
+          id: planId,
+          categoryKey: 'plan',
+          title: '[${room.name}] 확정 모임',
+          date: date,
+          roomLinks: [room.id],
+        ));
+      }
 
-      // Also add as a room shared event
-      final event = RoomSharedEvent(
-        id: 'room-ev-${DateTime.now().microsecondsSinceEpoch}',
-        roomId: room.id,
-        title: '[모임 확정] ${room.name}',
-        authorUid: room.members.first.uid,
-        date: date,
-        isAllDay: true,
+      // 공유 캘린더 일정 — 마찬가지로 고정 id로 교체.
+      final eventId = 'room-ev-${room.id}-meeting';
+      final rooms = ref.read(scheduleRoomsProvider.notifier);
+      rooms.removeRoomEvent(room.id, eventId);
+      rooms.addRoomEvent(
+        room.id,
+        RoomSharedEvent(
+          id: eventId,
+          roomId: room.id,
+          title: '[모임 확정] ${room.name}',
+          authorUid: room.members.firstWhere((m) => m.isHost, orElse: () => room.members.first).uid,
+          date: date,
+          isAllDay: true,
+        ),
       );
-      ref.read(scheduleRoomsProvider.notifier).addRoomEvent(room.id, event);
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -202,12 +246,17 @@ class _ScheduleRoomDetailScreenState
           children: [
             Row(
               children: [
-                Text(
-                  room.name,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
+                // 방 이름이 길면 좁은 폭에서 태그와 함께 넘친다 — 말줄임.
+                Flexible(
+                  child: Text(
+                    room.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -274,10 +323,10 @@ class _ScheduleRoomDetailScreenState
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildSharedCalendarTab(room, myMember),
-                _buildAvailabilityTab(room, myMember.uid),
-                _buildNoticeAndVoteTab(room, myMember),
-                _buildSettlementTab(room, myMember),
+                _maxWidth(_buildSharedCalendarTab(room, myMember)),
+                _maxWidth(_buildAvailabilityTab(room, myMember)),
+                _maxWidth(_buildNoticeAndVoteTab(room, myMember)),
+                _maxWidth(_buildSettlementTab(room, myMember)),
               ],
             ),
           ),
@@ -285,6 +334,16 @@ class _ScheduleRoomDetailScreenState
       ),
     );
   }
+
+  /// 탭 내용을 [kRoomContentMaxWidth] 폭으로 가운데 정렬 — 폰에서는 그대로 꽉 차고,
+  /// 넓은 화면에서는 카드·달력이 한 폭으로 맞춰진다.
+  Widget _maxWidth(Widget child) => Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: kRoomContentMaxWidth),
+          child: child,
+        ),
+      );
 
   // 0. 상단 고정(Pin) 공지사항 배너
   Widget _buildPinnedNoticesBanner(ScheduleRoom room, List<RoomNotice> pinnedNotices) {
@@ -337,8 +396,31 @@ class _ScheduleRoomDetailScreenState
   }
 
   // 1. 공유 캘린더 탭
+  /// 메인 캘린더에서 이 방에 공유(roomLinks)한 내 일정. 모임 확정 시 자동으로
+  /// 만들어지는 개인 사본('plan-room-')은 방 일정과 중복이라 제외한다.
+  List<RoomSharedEvent> _linkedMyEvents(ScheduleRoom room, String myUid) {
+    return [
+      for (final p in ref.watch(planListProvider))
+        if (p.roomLinks.contains(room.id) && !p.id.startsWith('plan-room-'))
+          RoomSharedEvent(
+            id: 'mycal-${p.id}',
+            roomId: room.id,
+            title: p.title,
+            authorUid: myUid,
+            date: p.date,
+            isAllDay: p.isAllDay || p.deadlineTime == null,
+            time: p.deadlineTime == null
+                ? null
+                : '${p.deadlineTime!.hour.toString().padLeft(2, '0')}:${p.deadlineTime!.minute.toString().padLeft(2, '0')}',
+          ),
+    ];
+  }
+
   Widget _buildSharedCalendarTab(ScheduleRoom room, RoomMember myMember) {
-    final selectedEvents = room.events.where((e) {
+    final linked = _linkedMyEvents(room, myMember.uid);
+    final linkedIds = {for (final e in linked) e.id};
+    final allEvents = [...room.events, ...linked];
+    final selectedEvents = allEvents.where((e) {
       return e.date.year == _selectedCalendarDate.year &&
           e.date.month == _selectedCalendarDate.month &&
           e.date.day == _selectedCalendarDate.day;
@@ -354,7 +436,7 @@ class _ScheduleRoomDetailScreenState
           const SizedBox(height: 16),
 
           // Shared Month Calendar Grid
-          _buildSharedCalendarMonthGrid(room),
+          _buildSharedCalendarMonthGrid(room, allEvents),
           const SizedBox(height: 16),
 
           // Events on selected date
@@ -398,7 +480,8 @@ class _ScheduleRoomDetailScreenState
               ),
             )
           else
-            for (final ev in selectedEvents) _buildEventTile(room, ev),
+            for (final ev in selectedEvents)
+              _buildEventTile(room, ev, fromMyCalendar: linkedIds.contains(ev.id)),
         ],
       ),
     );
@@ -469,7 +552,7 @@ class _ScheduleRoomDetailScreenState
     );
   }
 
-  Widget _buildSharedCalendarMonthGrid(ScheduleRoom room) {
+  Widget _buildSharedCalendarMonthGrid(ScheduleRoom room, List<RoomSharedEvent> events) {
     final year = _focusedMonth.year;
     final month = _focusedMonth.month;
     final daysInMonth = DateTime(year, month + 1, 0).day;
@@ -531,7 +614,8 @@ class _ScheduleRoomDetailScreenState
               crossAxisCount: 7,
               mainAxisSpacing: 4,
               crossAxisSpacing: 4,
-              childAspectRatio: 1.0,
+              // 정사각형(폭 비례)이면 넓은 화면에서 칸이 거대해진다 — 일정 조율 달력과 같은 고정 높이.
+              mainAxisExtent: kRoomGridCellHeight,
             ),
             itemBuilder: (context, index) {
               final dayNum = index - firstWeekday + 1;
@@ -544,7 +628,7 @@ class _ScheduleRoomDetailScreenState
                   cellDate.month == _selectedCalendarDate.month &&
                   cellDate.day == _selectedCalendarDate.day;
 
-              final dateEvents = room.events
+              final dateEvents = events
                   .where((e) =>
                       e.date.year == cellDate.year &&
                       e.date.month == cellDate.month &&
@@ -607,7 +691,9 @@ class _ScheduleRoomDetailScreenState
     );
   }
 
-  Widget _buildEventTile(ScheduleRoom room, RoomSharedEvent ev) {
+  /// [fromMyCalendar]: 메인 캘린더에서 "모임 방에 공유"로 연결된 내 일정 —
+  /// 원본은 메인 캘린더에 있으므로 여기서는 삭제 버튼 대신 표시만 한다.
+  Widget _buildEventTile(ScheduleRoom room, RoomSharedEvent ev, {bool fromMyCalendar = false}) {
     final author = room.members.firstWhere(
       (m) => m.uid == ev.authorUid,
       orElse: () => const RoomMember(uid: '', name: '멤버', icon: '👤', colorHex: '#38BDF8'),
@@ -650,6 +736,19 @@ class _ScheduleRoomDetailScreenState
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
               ),
               const Spacer(),
+              if (fromMyCalendar)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    '내 캘린더',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                  ),
+                )
+              else
               IconButton(
                 icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.grey),
                 onPressed: () {
@@ -698,8 +797,29 @@ class _ScheduleRoomDetailScreenState
   }
 
   // 2. 일정 조율 탭
-  Widget _buildAvailabilityTab(ScheduleRoom room, String myUid) {
-    final best = bestDateFor(room);
+  //
+  // 날짜를 누르면 "임시 선택"만 바뀌고, [저장하기]를 눌러야 멤버들에게 반영된다.
+  // 아래 "겹치는 날짜"에서 방장만 모임 날짜를 확정할 수 있고, 확정된 모임에는
+  // 멤버 각자 댓글을 단다.
+  Widget _buildAvailabilityTab(ScheduleRoom room, RoomMember myMember) {
+    final myUid = myMember.uid;
+    final savedMine = {
+      for (final e in room.dates.entries)
+        if (e.value.contains(myUid)) e.key,
+    };
+    final draft = _draftMyDates ?? savedMine;
+    final isDirty = draft.length != savedMine.length || !draft.containsAll(savedMine);
+
+    // 달력에는 저장 전 임시 선택까지 반영해서 보여준다.
+    final previewDates = <String, List<String>>{};
+    for (final e in room.dates.entries) {
+      final others = e.value.where((u) => u != myUid).toList();
+      if (others.isNotEmpty) previewDates[e.key] = others;
+    }
+    for (final d in draft) {
+      previewDates.putIfAbsent(d, () => []).add(myUid);
+    }
+    final previewRoom = room.copyWith(dates: previewDates);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(18),
@@ -719,7 +839,7 @@ class _ScheduleRoomDetailScreenState
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '가능한 날짜를 터치하여 등록하세요. 멤버들의 참여 가능 현황이 실시간 집계됩니다.',
+                    '가능한 날짜를 모두 고른 뒤 [저장하기]를 눌러주세요. 저장해야 멤버들에게 보여요.',
                     style: TextStyle(fontSize: 12, color: Color(0xFF1E40AF), fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -728,78 +848,284 @@ class _ScheduleRoomDetailScreenState
           ),
           const SizedBox(height: 16),
 
-          // Availability Matrix Grid
           RoomAvailabilityMonthGrid(
-            room: room,
+            room: previewRoom,
             focusedMonth: _focusedMonth,
             myUid: myUid,
             onDateToggle: (dateStr) {
-              ref.read(scheduleRoomsProvider.notifier).toggleAvailability(room.id, dateStr, myUid);
+              setState(() {
+                final next = {...draft};
+                if (!next.remove(dateStr)) next.add(dateStr);
+                _draftMyDates = next;
+              });
             },
             onPreviousMonth: _previousMonth,
             onNextMonth: _nextMonth,
           ),
+          const SizedBox(height: 12),
+
+          // 저장 / 취소
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  isDirty ? '저장하지 않은 변경이 있어요' : '내 가능 날짜 ${savedMine.length}일 저장됨',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isDirty ? const Color(0xFFB45309) : const Color(0xFF64748B),
+                  ),
+                ),
+              ),
+              if (isDirty) ...[
+                TextButton(
+                  onPressed: () => setState(() => _draftMyDates = null),
+                  child: const Text('변경 취소'),
+                ),
+                const SizedBox(width: 4),
+              ],
+              ElevatedButton(
+                onPressed: isDirty
+                    ? () {
+                        ref.read(scheduleRoomsProvider.notifier).setMyAvailability(room.id, myUid, draft);
+                        setState(() => _draftMyDates = null);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('✅ 가능 날짜 ${draft.length}일을 저장했어요.')),
+                        );
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: const Text('저장하기', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
 
-          // Best Day Banner & Confirmation
-          if (best.date != null && best.count > 0)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF9C3),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFFDE047)),
+          if (room.confirmedDate != null) ...[
+            _buildConfirmedMeetingCard(room, myMember),
+            const SizedBox(height: 20),
+          ],
+
+          _buildOverlapDates(room, myMember),
+        ],
+      ),
+    );
+  }
+
+  /// 화면 맨 아래 "겹치는 날짜" — 저장된 가능 날짜 기준, 인원 많은 순.
+  /// 방장만 [이 날짜로 확정]을 누를 수 있다.
+  Widget _buildOverlapDates(ScheduleRoom room, RoomMember myMember) {
+    final total = room.members.length;
+    final entries = room.dates.entries.where((e) => e.value.isNotEmpty).toList()
+      ..sort((a, b) {
+        final byCount = b.value.length.compareTo(a.value.length);
+        return byCount != 0 ? byCount : a.key.compareTo(b.key);
+      });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              '겹치는 날짜',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+            ),
+            const Spacer(),
+            Text(
+              myMember.isHost ? '방장만 확정할 수 있어요' : '날짜 확정은 방장이 해요',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (entries.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: const Center(
+              child: Text(
+                '아직 저장된 가능 날짜가 없어요',
+                style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+          )
+        else
+          for (final e in entries.take(8))
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: e.value.length == total ? const Color(0xFFFEF9C3) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: e.value.length == total ? const Color(0xFFFDE047) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      const Text('🌟', style: TextStyle(fontSize: 18)),
-                      const SizedBox(width: 6),
-                      Text(
-                        '최다 인원 가능일: ${_shortDateLabel(best.date!)} (${best.count}/${room.members.length}명)',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF854D0E),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              _shortDateLabel(e.key),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              e.value.length == total ? '전원 가능' : '${e.value.length}/$total명',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: e.value.length == total ? const Color(0xFF854D0E) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          room.members.where((m) => e.value.contains(m.uid)).map((m) => '${m.icon}${m.name}').join(' '),
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => _handleConfirmDate(context, room, best.date!),
+                  if (room.confirmedDate == e.key)
+                    const Text('확정됨 ✓', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)))
+                  else if (myMember.isHost)
+                    ElevatedButton(
+                      onPressed: () => _handleConfirmDate(context, room, e.key),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F172A),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
                       ),
-                      child: const Text(
-                        '이 날짜로 모임 확정하기',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      child: const Text('이 날짜로 확정', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ),
+                ],
+              ),
+            ),
+      ],
+    );
+  }
+
+  /// 확정된 모임 + 멤버 댓글.
+  Widget _buildConfirmedMeetingCard(ScheduleRoom room, RoomMember myMember) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF0F172A), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '📌 모임 확정: ${_shortDateLabel(room.confirmedDate!)}',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '참석 여부나 하고 싶은 말을 남겨주세요.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 10),
+          for (final c in room.meetingComments)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(c.authorIcon, style: const TextStyle(fontSize: 14)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '${c.authorName}  ',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                          TextSpan(text: c.content),
+                        ],
                       ),
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
                     ),
                   ),
                 ],
               ),
-            )
-          else
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  '아직 아무도 가능 날짜를 표시하지 않았어요',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _meetingCommentController,
+                  decoration: InputDecoration(
+                    hintText: '예: 참석! 7시쯤 도착해요',
+                    isDense: true,
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                  ),
+                  style: const TextStyle(fontSize: 13),
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () {
+                  final text = _meetingCommentController.text.trim();
+                  if (text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('댓글 내용을 입력해주세요.')),
+                    );
+                    return;
+                  }
+                  ref.read(scheduleRoomsProvider.notifier).addMeetingComment(
+                        room.id,
+                        NoticeComment(
+                          id: 'mc-${DateTime.now().microsecondsSinceEpoch}',
+                          authorUid: myMember.uid,
+                          authorName: myMember.name,
+                          authorIcon: myMember.icon,
+                          content: text,
+                          createdAt: DateTime.now(),
+                        ),
+                      );
+                  _meetingCommentController.clear();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: const Text('등록', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
         ],
       ),
     );

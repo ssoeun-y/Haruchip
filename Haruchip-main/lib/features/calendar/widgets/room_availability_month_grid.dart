@@ -7,8 +7,12 @@ import '../models/schedule_room.dart';
 /// 날짜 칸 고정 높이 — 날짜 숫자 + "n/전체명" 배지가 들어가는 최소 높이.
 const double kRoomGridCellHeight = 40;
 
-/// 넓은 화면에서 달력이 끝없이 커지지 않도록 하는 최대 폭.
-const double kRoomGridMaxWidth = 480;
+/// 모임방 상세 화면 각 탭 내용의 최대 폭 — 넓은 화면(폴드 펼침/태블릿/웹)에서도
+/// 공유 캘린더·일정 조율 달력·안내 카드가 같은 폭으로 가운데 정렬된다.
+const double kRoomContentMaxWidth = 560;
+
+/// 넓은 화면에서 달력이 끝없이 커지지 않도록 하는 최대 폭 (탭 내용 폭과 동일).
+const double kRoomGridMaxWidth = kRoomContentMaxWidth;
 
 /// 방 상세 화면의 "가능한 날짜 표시" 그리드 — 미니 월간뷰 방식.
 ///

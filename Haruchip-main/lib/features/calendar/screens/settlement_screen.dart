@@ -464,7 +464,7 @@ class _SettlementScreenState extends ConsumerState<SettlementScreen> {
                               Icon(Icons.add_rounded, size: 14, color: Colors.amberAccent),
                               SizedBox(width: 4),
                               Text(
-                                '+ 차수 추가하기',
+                                '차수 추가하기',
                                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amberAccent),
                               ),
                             ],
@@ -499,7 +499,7 @@ class _SettlementScreenState extends ConsumerState<SettlementScreen> {
                     border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
                   child: const Center(
-                    child: Text('등록된 정산 차수가 없습니다. [+ 차수 추가하기]를 눌러 등록해보세요.', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                    child: Text('등록된 정산 차수가 없습니다. [차수 추가하기]를 눌러 등록해보세요.', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
                   ),
                 )
               else

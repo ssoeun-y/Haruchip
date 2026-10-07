@@ -710,6 +710,7 @@ class ScheduleRoom {
     this.votes = const [],
     this.rounds = const [],
     this.settlementHistory = const [],
+    this.meetingComments = const [],
     this.isDeleted = false,
     this.deletedAt,
   });
@@ -737,6 +738,9 @@ class ScheduleRoom {
   final List<SettlementRound> rounds;
   final List<SettlementRecord> settlementHistory;
 
+  /// 확정된 모임 일정에 멤버들이 남기는 댓글 (참석 여부·한마디)
+  final List<NoticeComment> meetingComments;
+
   final bool isDeleted;
   final DateTime? deletedAt;
 
@@ -756,6 +760,7 @@ class ScheduleRoom {
     List<RoomVote>? votes,
     List<SettlementRound>? rounds,
     List<SettlementRecord>? settlementHistory,
+    List<NoticeComment>? meetingComments,
     bool? isDeleted,
     DateTime? deletedAt,
   }) {
@@ -779,6 +784,7 @@ class ScheduleRoom {
       votes: votes ?? this.votes,
       rounds: rounds ?? this.rounds,
       settlementHistory: settlementHistory ?? this.settlementHistory,
+      meetingComments: meetingComments ?? this.meetingComments,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
     );

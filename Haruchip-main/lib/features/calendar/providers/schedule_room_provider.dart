@@ -475,11 +475,43 @@ class ScheduleRoomListNotifier extends Notifier<List<ScheduleRoom>> {
     return room.copyWith(dates: updatedDates);
   }
 
-  /// 9. 날짜 확정
+  /// 8-1. 내 가능 날짜를 한 번에 저장 ("저장하기" 버튼). [myDates]에 없는
+  /// 날짜에서는 내 uid가 빠지고, 있는 날짜에는 들어간다.
+  void setMyAvailability(String roomId, String myUid, Set<String> myDates) {
+    state = [
+      for (final room in state)
+        if (room.id == roomId) _withMyDates(room, myUid, myDates) else room,
+    ];
+  }
+
+  ScheduleRoom _withMyDates(ScheduleRoom room, String myUid, Set<String> myDates) {
+    final updated = <String, List<String>>{};
+    for (final entry in room.dates.entries) {
+      final uids = entry.value.where((u) => u != myUid).toList();
+      if (uids.isNotEmpty) updated[entry.key] = uids;
+    }
+    for (final d in myDates) {
+      updated.putIfAbsent(d, () => []).add(myUid);
+    }
+    return room.copyWith(dates: updated);
+  }
+
+  /// 9. 날짜 확정 (방장)
   void confirmDate(String roomId, String date) {
     state = [
       for (final room in state)
         if (room.id == roomId) room.copyWith(confirmedDate: date) else room,
+    ];
+  }
+
+  /// 9-1. 확정된 모임 일정에 댓글 달기
+  void addMeetingComment(String roomId, NoticeComment comment) {
+    state = [
+      for (final room in state)
+        if (room.id == roomId)
+          room.copyWith(meetingComments: [...room.meetingComments, comment])
+        else
+          room,
     ];
   }
 
