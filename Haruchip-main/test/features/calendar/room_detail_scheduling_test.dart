@@ -106,6 +106,31 @@ void main() {
     expect(room.events.where((e) => e.id == 'room-ev-room-1-meeting').single.date, DateTime(2026, 10, 5));
   });
 
+  testWidgets('겹치는 날짜에는 2명 이상 겹친 날만 남고, 나 혼자 고른 날은 안 나온다', (tester) async {
+    final c = await _open(tester, 'room-1');
+    await _goAvailabilityTab(tester);
+
+    // 나 혼자 20일 저장
+    await tester.tap(find.descendant(of: find.byType(RoomAvailabilityMonthGrid), matching: find.text('20')));
+    await _settle(tester);
+    await tester.tap(find.text('저장하기'));
+    await _settle(tester);
+
+    final now = DateTime.now();
+    const days = ['월', '화', '수', '목', '금', '토', '일'];
+    final d20 = DateTime(now.year, now.month, 20);
+    final label20 = '${d20.month}/20(${days[d20.weekday - 1]})';
+    expect(c.read(scheduleRoomsProvider).firstWhere((r) => r.id == 'room-1').dates.values.any((v) => v.length == 1), isTrue);
+    expect(find.text(label20), findsNothing, reason: '1명만 고른 날짜는 겹치는 날짜가 아니다');
+
+    // 샘플의 2명 이상 날짜(10/1 4명, 10/5 3명, 10/12 2명)는 남는다
+    expect(find.text('전원 가능'), findsOneWidget);
+    // 달력 칸에도 'n/4명'이 찍히므로 겹치는 날짜 줄(Wrap) 안에서만 찾는다.
+    expect(find.descendant(of: find.byType(Wrap), matching: find.text('3/4명')), findsOneWidget);
+    expect(find.descendant(of: find.byType(Wrap), matching: find.text('2/4명')), findsOneWidget);
+    expect(find.descendant(of: find.byType(Wrap), matching: find.text('1/4명')), findsNothing);
+  });
+
   testWidgets('방장이 아니면 확정 버튼이 없다', (tester) async {
     await _open(tester, 'room-2');
     await _goAvailabilityTab(tester);

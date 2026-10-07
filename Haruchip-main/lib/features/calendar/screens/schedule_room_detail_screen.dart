@@ -917,11 +917,11 @@ class _ScheduleRoomDetailScreenState
     );
   }
 
-  /// 화면 맨 아래 "겹치는 날짜" — 저장된 가능 날짜 기준, 인원 많은 순.
+  /// 화면 맨 아래 "겹치는 날짜" — 저장된 가능 날짜 중 **2명 이상 겹친 날만**, 인원 많은 순.
   /// 방장만 [이 날짜로 확정]을 누를 수 있다.
   Widget _buildOverlapDates(ScheduleRoom room, RoomMember myMember) {
     final total = room.members.length;
-    final entries = room.dates.entries.where((e) => e.value.isNotEmpty).toList()
+    final entries = room.dates.entries.where((e) => e.value.length >= 2).toList()
       ..sort((a, b) {
         final byCount = b.value.length.compareTo(a.value.length);
         return byCount != 0 ? byCount : a.key.compareTo(b.key);
@@ -953,10 +953,10 @@ class _ScheduleRoomDetailScreenState
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: const Center(
+            child: Center(
               child: Text(
-                '아직 저장된 가능 날짜가 없어요',
-                style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                total < 2 ? '멤버가 2명 이상 모이면 겹치는 날짜가 보여요' : '아직 2명 이상 겹치는 날짜가 없어요',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
               ),
             ),
           )
