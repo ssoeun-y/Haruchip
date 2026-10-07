@@ -3,11 +3,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'design_system/colors.dart';
 import 'features/onboarding/screens/category_selection_screen.dart';
 import 'features/onboarding/screens/splash_screen.dart';
 import 'firebase_options.dart';
+import 'services/storage/local_store.dart';
 
 /// 전역 스크롤 및 마우스/터치 드래그 제스처 인에이블러
 class HaruAppScrollBehavior extends MaterialScrollBehavior {
@@ -36,7 +38,15 @@ class HaruAppScrollBehavior extends MaterialScrollBehavior {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const ProviderScope(child: HaruChipApp()));
+  // 카테고리/일정/휴지통 로컬 저장소 — Notifier.build()가 동기로 읽을 수
+  // 있도록 runApp 전에 미리 로드한다.
+  final prefs = await SharedPreferences.getInstance();
+  runApp(
+    ProviderScope(
+      overrides: [localStoreProvider.overrideWithValue(SharedPrefsLocalStore(prefs))],
+      child: const HaruChipApp(),
+    ),
+  );
 }
 
 class HaruChipApp extends StatelessWidget {

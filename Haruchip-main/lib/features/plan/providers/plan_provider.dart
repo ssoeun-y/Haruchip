@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' show Color;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/colors.dart';
+import '../../../services/storage/local_store.dart';
 import '../../categories/logic/repeat_rule.dart';
 import '../data/plan_mock_data.dart';
 import '../models/plan_item.dart';
@@ -17,8 +18,17 @@ List<PlanItem> _sortedByDate(List<PlanItem> items) {
 /// 카테고리는 태그 개념(CLAUDE.md §5)이라 동일 categoryKey를 가진 항목을
 /// 몇 개든 추가할 수 있다 — [addItem]에 카테고리 중복 제한이 없다.
 class PlanListNotifier extends Notifier<List<PlanItem>> {
+  /// 로컬 저장소에 저장된 목록이 있으면 그걸, 첫 실행이면 기존 목업으로
+  /// 시작한다. 이후 상태가 바뀔 때마다 저장소에 다시 쓴다.
   @override
-  List<PlanItem> build() => _sortedByDate(mockPlanItems);
+  List<PlanItem> build() {
+    final store = ref.watch(localStoreProvider);
+    listenSelf((_, next) {
+      writeJsonList(store, LocalStoreKeys.plans, next, (p) => p.toJson());
+    });
+    final saved = readJsonList(store, LocalStoreKeys.plans, PlanItem.fromJson);
+    return _sortedByDate(saved ?? mockPlanItems);
+  }
 
   void addItem(PlanItem item) {
     state = _sortedByDate([...state, item]);

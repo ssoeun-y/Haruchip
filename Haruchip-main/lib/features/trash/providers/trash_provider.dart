@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../services/storage/local_store.dart';
 import '../models/trash_item.dart';
 
 /// 초기 목업 휴지통 샘플 데이터
@@ -78,6 +79,15 @@ class TrashBinNotifier extends StateNotifier<List<TrashItem>> {
   }
 }
 
+/// 저장된 휴지통이 있으면 복원(생성자에서 30일 지난 항목은 바로 정리),
+/// 첫 실행이면 기존 목업으로 시작한다. 변경 시마다 저장한다.
 final trashBinProvider = StateNotifierProvider<TrashBinNotifier, List<TrashItem>>((ref) {
-  return TrashBinNotifier();
+  final store = ref.watch(localStoreProvider);
+  final saved = readJsonList(store, LocalStoreKeys.trash, TrashItem.fromJson);
+  final notifier = TrashBinNotifier(saved);
+  notifier.addListener(
+    (items) => writeJsonList(store, LocalStoreKeys.trash, items, (t) => t.toJson()),
+    fireImmediately: false,
+  );
+  return notifier;
 });

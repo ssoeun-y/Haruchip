@@ -34,4 +34,19 @@ class ExamTimelineEntry {
 
   final ExamStage stage;
   final DateTime date;
+
+  Map<String, dynamic> toJson() => {
+        'stage': stage.name,
+        'date': date.toIso8601String(),
+      };
+
+  factory ExamTimelineEntry.fromJson(Map<String, dynamic> json) {
+    return ExamTimelineEntry(
+      stage: ExamStage.values.firstWhere(
+        (e) => e.name == json['stage'],
+        orElse: () => ExamStage.application,
+      ),
+      date: DateTime.parse(json['date'] as String),
+    );
+  }
 }

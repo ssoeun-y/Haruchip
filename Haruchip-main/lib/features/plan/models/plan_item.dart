@@ -83,6 +83,35 @@ class CalendarSyncFlags {
       haruchip: haruchip ?? this.haruchip,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'google': google,
+        'naver': naver,
+        'haruchip': haruchip,
+      };
+
+  factory CalendarSyncFlags.fromJson(Map<String, dynamic> json) {
+    return CalendarSyncFlags(
+      google: json['google'] as bool? ?? false,
+      naver: json['naver'] as bool? ?? false,
+      haruchip: json['haruchip'] as bool? ?? false,
+    );
+  }
+}
+
+/// [TimeOfDay] ↔ 'HH:mm' (로컬 저장/백업용).
+String? _timeToJson(TimeOfDay? t) => t == null
+    ? null
+    : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+TimeOfDay? _timeFromJson(Object? v) {
+  if (v is! String) return null;
+  final parts = v.split(':');
+  if (parts.length != 2) return null;
+  final h = int.tryParse(parts[0]);
+  final m = int.tryParse(parts[1]);
+  if (h == null || m == null) return null;
+  return TimeOfDay(hour: h, minute: m);
 }
 
 /// D-day 리스트 화면(plan)에서 다루는 항목 하나.
@@ -239,6 +268,11 @@ class PlanItem {
         'photoUrl': photoUrl,
         'roomLinks': roomLinks,
         'isPredicted': isPredicted,
+        'repeatConfig': repeatConfig.toJson(),
+        'calendarSync': calendarSync.toJson(),
+        'examTimeline': examTimeline.map((e) => e.toJson()).toList(),
+        'deadlineTime': _timeToJson(deadlineTime),
+        'endDeadlineTime': _timeToJson(endDeadlineTime),
       };
 
   factory PlanItem.fromJson(Map<String, dynamic> json) {
@@ -266,6 +300,21 @@ class PlanItem {
       photoUrl: json['photoUrl'] as String?,
       roomLinks: (json['roomLinks'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
       isPredicted: json['isPredicted'] as bool? ?? false,
+      // 아래 필드들은 이전 버전 백업 JSON엔 없다 — 없으면 기존 기본값.
+      repeatConfig: json['repeatConfig'] is Map
+          ? RepeatConfig.fromJson(Map<String, dynamic>.from(json['repeatConfig'] as Map))
+          : null,
+      repeat: json['repeat'] as bool? ?? false,
+      calendarSync: json['calendarSync'] is Map
+          ? CalendarSyncFlags.fromJson(Map<String, dynamic>.from(json['calendarSync'] as Map))
+          : const CalendarSyncFlags(),
+      examTimeline: (json['examTimeline'] as List<dynamic>?)
+              ?.whereType<Map>()
+              .map((e) => ExamTimelineEntry.fromJson(Map<String, dynamic>.from(e)))
+              .toList() ??
+          const [],
+      deadlineTime: _timeFromJson(json['deadlineTime']),
+      endDeadlineTime: _timeFromJson(json['endDeadlineTime']),
     );
   }
 }

@@ -44,6 +44,28 @@ class RepeatConfig {
       daysOfYear: daysOfYear ?? this.daysOfYear,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'type': type.name,
+        'weekdays': weekdays,
+        'daysOfMonth': daysOfMonth,
+        'daysOfYear': daysOfYear,
+      };
+
+  factory RepeatConfig.fromJson(Map<String, dynamic> json) {
+    List<int> ints(Object? v) =>
+        (v as List<dynamic>?)?.map((e) => (e as num).toInt()).toList() ?? const [];
+    return RepeatConfig(
+      type: RepeatType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => RepeatType.none,
+      ),
+      weekdays: ints(json['weekdays']),
+      daysOfMonth: ints(json['daysOfMonth']),
+      daysOfYear:
+          (json['daysOfYear'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+    );
+  }
 }
 
 /// [baseDate] 기준으로 [config]의 규칙을 적용했을 때, [from](기본값 오늘)
