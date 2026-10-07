@@ -4,6 +4,12 @@ import '../../../design_system/colors.dart';
 import '../../../design_system/typography.dart';
 import '../models/schedule_room.dart';
 
+/// 날짜 칸 고정 높이 — 날짜 숫자 + "n/전체명" 배지가 들어가는 최소 높이.
+const double kRoomGridCellHeight = 40;
+
+/// 넓은 화면에서 달력이 끝없이 커지지 않도록 하는 최대 폭.
+const double kRoomGridMaxWidth = 480;
+
 /// 방 상세 화면의 "가능한 날짜 표시" 그리드 — 미니 월간뷰 방식.
 ///
 /// CLAUDE.md §7-5(방 상세 플로우 1~3번: 날짜 그리드 탭으로 본인 가능여부
@@ -64,8 +70,13 @@ class RoomAvailabilityMonthGrid extends StatelessWidget {
     final leadingBlanks = firstOfMonth.weekday % 7;
     final memberCount = room.members.length;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
+    // 칸 높이를 폭 비례(childAspectRatio)로 두면 넓은 화면(폴드 펼침/태블릿/웹)에서
+    // 달력이 세로로 크게 늘어난다 — 칸 높이는 고정, 전체 폭은 상한을 둔다.
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: kRoomGridMaxWidth),
+        child: Container(
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.protoCardBg,
         borderRadius: BorderRadius.circular(24),
@@ -126,7 +137,7 @@ class RoomAvailabilityMonthGrid extends StatelessWidget {
               crossAxisCount: 7,
               mainAxisSpacing: 2,
               crossAxisSpacing: 2,
-              childAspectRatio: 0.8,
+              mainAxisExtent: kRoomGridCellHeight,
             ),
             itemCount: leadingBlanks + daysInMonth,
             itemBuilder: (context, index) {
@@ -205,6 +216,8 @@ class RoomAvailabilityMonthGrid extends StatelessWidget {
             },
           ),
         ],
+      ),
+        ),
       ),
     );
   }
